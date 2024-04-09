@@ -173,7 +173,7 @@ lines(ts(mu_pred$mxt_pred[a,],start=2012),type='l',col='red',lwd=3)
 
 
 IC=int_conf(FraMaleData,20:85,1980:2011,2012:2019,0.54,45,60)
-
+######
 
 
 
