@@ -175,6 +175,11 @@ lines(ts(mu_pred$mxt_pred[a,],start=2012),type='l',col='red',lwd=3)
 IC=int_conf(FraMaleData,20:85,1980:2011,2012:2019,0.54,45,60)
 ######
 
+a=35
+plot(ts(mu_pred$mxt_pred[a,],start = 2012),col=1)
+lines(ts(IC$IC_max[a,],start = 2012),col=2)
+lines(ts(IC$mean_pred[a,],start = 2012),col=3)
+lines(ts(IC$IC_min[a,],start = 2012),col=4)
 
 
 
