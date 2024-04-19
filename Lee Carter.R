@@ -91,6 +91,19 @@ mape_lc=mean(abs(fore_lc$rates[,1:8]-mx_test)/mx_test)
 mape_lc
 
 
+ages.fit=0:99
+years.fit=1950:2005
+mx_test=male_rate[1:100,191:203]
+wei=genWeightMat(ages=ages.fit,years=years.fit)
+LCfit=fit(LC,data=FraMaleData,ages.fit = ages.fit, 
+          years.fit = years.fit, wxt = wei)
+### Forecasting with PLAT
+fore_lc=forecast(LCfit,h=50 )
+plot(fore_lc$rates)
+mape_lc=mean(abs(fore_lc$rates[,1:13]-mx_test)^2)
+mape_lc
+
+
 boost_echant=function(data,ages,years,B=1000)
 {
   "data représente les données de mortalités"
