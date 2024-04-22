@@ -389,10 +389,10 @@ i_kt4_kt5=function(dxt_est,w_xt,ages.fit,years.fit,x1,x2,c,a_c,Ic)
   Ic_bar=mean(Ic)
   t=matrix(pmax(Ic-Ic_bar,0),nrow=1) ## t in 1*T
   
-  b=a%*%t ## b in X*1*1*T
+  coef2=a%*%t ## b in X*1*1*T
   d=b*dxt_est ### b*dxt_est pas un produit matriciel
   
-  a=matrix((pmax(x1-ages,0)+c*pmax(ages-x2,0)),nrow=1) ### the main idea is to recover sum_x{(bar{x}-x)*hat{dxt_est}
+  coef1=matrix((pmax(x1-ages,0)+c*pmax(ages-x2,0)),nrow=1) ### the main idea is to recover sum_x{(bar{x}-x)*hat{dxt_est}
   diag(a%*%d)
 }
 
@@ -423,9 +423,35 @@ i_kt4_gamma=function(dxt_est,ages.fit,years.fit,x1,x2,c)
   kt4_gamma
 }
 
-i_kt5_gamma=function()
+i_kt5_gamma=function(dxt_est,w_xt,ages.fit,years.fit,a_c,Ic)
 {
+  "
+  C'est la même idée que alpha_gamma sauf que ici c'est l'age qui varie et on 
+  met le coefficient de kt5 devant chaque fois.
+  "
+  n=dim(dxt_est)[2] ### length of years
+  x_bar=mean(ages)
   
+  ### reshape a and t to have (x-a_c)^{+}(Ic-Ic_bar)^+
+  a=matrix(pmax(ages-a_c,0),ncol=1) ## a in X*1 
+  Ic_bar=mean(Ic)
+  t=matrix(pmax(Ic-Ic_bar,0),nrow=1) ## t in 1*T
+  
+  coef=a%*%t ## b in X*1*1*T
+  
+  kt5_gamma=matrix(nrow = k,ncol = length(coh),dimnames = list(years.fit,coh))
+  
+  ### i pour l'âge, j pour l'année et t pour la cohorte
+  for (j in 1:k)
+    for(t in 1:length(coh))
+    {
+      a=c()
+      for(i in 1:n)
+        if(j-i==coh[t])
+          a=cbind(a,(coef[i]*dxt_est[i,j]))
+      kt5_gamma[j,t]=sum(a)
+    }
+  kt5_gamma
 }
 
 
