@@ -238,7 +238,7 @@ fr_e=FraMaleData$Ext[21:86,(1980-1816+1):(2011-1816+1)]
 wei=genWeightMat(ages=ages.fit,years=years.fit)
 plat=plat_function(fr_m,fr_e,wei,ages.fit,years.fit)
 
-
+fit_model(plat,20:85,1980:2011)$
 
 
 plat_criteria=get_criterion(plat,FraMaleData,ages.fit,years.fit)
@@ -461,4 +461,30 @@ mx_test=male_rate[21:86,197:204]
 mape_plat=mean(abs(plat_mu-mx_test)/mx_test)
 mape_plat
 ### mape sur 2012-2019, 0.2248657
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ages.fit=20:85
+years.fit=1980:2011
+fr_m=FraMaleData$Dxt[21:86,(1980-1816+1):(2011-1816+1)]
+fr_e=FraMaleData$Ext[21:86,(1980-1816+1):(2011-1816+1)]
+wei=genWeightMat(ages=ages.fit,years=years.fit)
+plat=plat_function(fr_m,fr_e,wei,ages.fit,years.fit)
+
+dxt_est=fit_model(plat,20:85,1980:2011)$Dxt_fit
+
+I=information_plat(dxt_est,ages.fit,years.fit)
+
+
 
