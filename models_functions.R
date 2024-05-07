@@ -294,7 +294,7 @@ model_function=function(dxt,ext,wxt,Ic,a,c_x,a_c,ages,years,x1,x2)
     kt3=ts(kt3,start=years[1],frequency=1),
     kt4=ts(kt4,start=years[1],frequency=1),
     kt5=kt5,
-    gc=ts(gc,start = cohort[1]+4,frequency = 1),
+    gc=ts(gc,start = cohort[1],frequency = 1),
     #gc=ts(gc,start = cohort[1],frequency = 1),
     Dxt=dxt,
     Ext=ext,
@@ -328,7 +328,7 @@ get_estimation=function(data, ages, years, c, a_c=65, x1, x2)
   fr_e=data$Ext[(ages[1]-age_head+1):(tail(ages,1)-age_head+1),
                 (years[1]-year_head+1):(tail(years,1)-year_head+1)]
   wei=genWeightMat(ages=ages,years=years)
-  Ic=df[(years[1]-1961+1):(tail(years,1)-1961+1),6]
+  Ic=df[(years[1]-1961+1):(tail(years,1)-1961+1),1]
   a_m=mean(Ic)
   
   m2=model_function(fr_m,fr_e,wei,Ic,a_m,c,a_c,ages,years,x1,x2)
@@ -353,8 +353,11 @@ get_estimation=function(data, ages, years, c, a_c=65, x1, x2)
 
 
 #forecasting fonction
-get_predict=function(estim,years_pred)
+get_predict=function(estim,years_pred,i)
 {
+  "
+  i indique le choix du scénario RCP, 1 pour RCP2.6, 2 pour RCP4.5 et 3 pour RCP8.5
+  "
   h=length(years_pred)
   
   fit1=auto.arima(estim$kt1)
@@ -379,8 +382,8 @@ get_predict=function(estim,years_pred)
   
   kt5_est=ts(l$y,start=1,frequency = 1)
   fit5=auto.arima(kt5_est)
-  fore_5=forecast(fit5,8*h)
-  t=seq(3,30,by=3)
+  fore_5=forecast(fit5,20*h)
+  t=seq(3,(20*h),by=3)
   kt5_pred=fore_5$mean[t]
   #plot(fore_5)
   #print(kt5_pred)
@@ -415,7 +418,8 @@ get_predict=function(estim,years_pred)
   x=estim$ages
   x.bar=mean(x)
   a_m=estim$a_m
-  Ic=df[(years_pred[1]-1961+1):(tail(years_pred,1)-1961+1),6]
+  Ic=df[(years_pred[1]-1961+1):(tail(years_pred,1)-1961+1),i]
+  
   
   
   ###Construction de la matrice de kt_5
@@ -651,27 +655,31 @@ boost_echant=function(data,ages,years,B=1000)
                (years_head-data_years_head+1):(years_tail-data_years_head+1)]
   
   Dxt_b=array(dim = c(B,dim(Dxt)[1],dim(Dxt)[2]))
-  for(x in 1:B){
-    for(a in 1:dim(Dxt)[1]){
-      for(b in 1:dim(Dxt)[2])
-      {
-        Dxt_b[x,a,b]=rpois(1,Dxt[a,b])
-      }
+  #for(x in 1:B){
+  for(a in 1:dim(Dxt)[1]){
+    for(b in 1:dim(Dxt)[2])
+    {
+      Dxt_b[,a,b]=rpois(B,Dxt[a,b])
     }
   }
+  #}
   Dxt_b
 }
 
 
-int_conf=function(data,ages,years,years_pred,c,x1,x2,B=5000)
+int_conf=function(data,ages,years,years_pred,c,x1,x2,B=100)
 {
-  dxt=boost_echant(data,0:110,1816:2020,B)
+  a_min=data$ages[1]
+  a_max=tail(data$ages,1)
+  y_min=data$years[1]
+  y_max=tail(data$years,1)
+  dxt=boost_echant(data,a_min:a_max,y_min:y_max,B)
   mu_pred=array(dim=c(B,length(ages),length(years_pred)))
   
   data$Dxt=dxt[1,,]
   model=get_estimation(data,ages,
                        years,c,a_c=65,x1,x2)
-  mu_pred[1,,]=get_predict(model,years_pred)$mxt_pred
+  mu_pred[1,,]=get_predict(model,years_pred,1)$mxt_pred
   
   #plot(ts(mu_pred[1,(a_plot-20+1),],start = years_pred[1]),col='black',
   #    ylim=c(min(mu_pred[1,(a_plot-20+1),]),
@@ -682,7 +690,7 @@ int_conf=function(data,ages,years,years_pred,c,x1,x2,B=5000)
     data$Dxt=dxt[i,,]
     model=get_estimation(data,ages,
                          years,c,a_c=65,x1,x2)
-    mu_pred[i,,]=get_predict(model,years_pred)$mxt_pred
+    mu_pred[i,,]=get_predict(model,years_pred,1)$mxt_pred
     #lines(ts(mu_pred[i,(a_plot-20+1),],start = years_pred[1]),
     #      col="black",ylim=c(min(mu_pred[i,(a_plot-20+1),]),
     #                        max(mu_pred[i,(a_plot-20+1),])))
@@ -697,8 +705,10 @@ int_conf=function(data,ages,years,years_pred,c,x1,x2,B=5000)
     {
       mean_pred[x,y]=mean(mu_pred[,x,y])
       se_pred[x,y]=sd(mu_pred[,x,y])
-      IC_min[x,y]=mean_pred[x,y]-1.96*se_pred[x,y]/sqrt(B)
-      IC_max[x,y]=mean_pred[x,y]+1.96*se_pred[x,y]/sqrt(B)
+      IC_min[x,y]=mean_pred[x,y]-1.645*se_pred[x,y]/sqrt(B)
+      IC_max[x,y]=mean_pred[x,y]+1.645*se_pred[x,y]/sqrt(B)
+      #IC_min[x,y]=mean(sort(mu_pred[,x,y])[1:500])
+      #IC_max[x,y]=mean(sort(mu_pred[,x,y],decreasing = TRUE)[1:500])
     }
   }
   list(mu_pred=mu_pred,
@@ -708,6 +718,406 @@ int_conf=function(data,ages,years,years_pred,c,x1,x2,B=5000)
        IC_max=IC_max)
   
 }
+
+sim_ic_method=function(mode, ages.fit, years.fit, years.pred, x1, x2, c, a_c=65, N=100)
+{
+  
+  "
+  Simuler plusieurs scénarios de kt1,kt2,... et récupérer les taux de mortalité 
+  correspondants à chaque scénario pour obtenir le taux moyenne sur les N scénarios
+  et le taux moyenne pour les 25% plus bas et 2,5% plus grand.
+  
+  Args:
+    model: modèle plat,spo, modèle proposé,...
+    ages.fit (vecteur): Liste des labels d'âges
+    years.fit (vecteur): Liste des labels d'année d'estimation
+    years.pred (vecteur): Liste des labels d'année de prédiction
+    N (int): Entier pour le nombre de stimulation
+    
+  Return:
+    
+  "
+  n.a=length(ages.fit)
+  n.y=length(years.fit)
+  n.t=length(years.pred)
+  model=mode
+  ### Récupérer les valeurs des paramètres du modèle
+  kt1=model$kt1
+  kt2=model$kt2
+  kt3=model$kt3
+  kt4=model$kt4
+  kt5=model$kt5
+  gc=model$gc
+  ax=model$ax
+  
+  ### Fiter un auto.arima sur les paramètres
+  #fit1=Arima(kt1, order=c(0,1,0), include.drift = FALSE)
+  #sim_kt1=ts(replicate(N,simulate(fit1,nsim = n.t)),start = end(kt1)+1)
+  
+  #fit2=Arima(kt2, order=c(1,0,0),include.mean = FALSE)
+  #sim_kt2=ts(replicate(N,simulate(fit2,nsim = n.t)),start = end(kt2)+1)
+  
+  
+  #fit3=Arima(kt3, order=c(1,1,0),include.mean = FALSE)
+  #sim_kt3=ts(replicate(N,simulate(fit3,nsim = n.t)),start = end(kt3)+1)
+  
+  #fit4=Arima(kt4, order=c(1,0,0),include.mean = FALSE)
+  #sim_kt4=ts(replicate(N,simulate(fit4,nsim = n.t)),start = end(kt3)+1)
+  
+  fit1=auto.arima(kt1)
+  sim_kt1=ts(replicate(N,simulate(fit1,nsim = n.t)),start = end(kt1)+1)
+  
+  fit2=auto.arima(kt2)
+  sim_kt2=ts(replicate(N,simulate(fit2,nsim = n.t)),start = end(kt2)+1)
+  
+  fit3=auto.arima(kt3)
+  sim_kt3=ts(replicate(N,simulate(fit3,nsim = n.t)),start = end(kt3)+1)
+  
+  fit4=auto.arima(kt4)
+  sim_kt4=ts(replicate(N,simulate(fit4,nsim = n.t)),start = end(kt4)+1)
+  
+  x = seq(from = 1 , to = length(kt5) , by = 1)
+  y = kt5
+  l = Reg(x , y)# Data augmentation by inserting two points.
+  
+  kt5_est=ts(l$y,start=1,frequency = 1)
+  #fit5=Arima(kt5_est,order=c(1,0,0),include.mean = FALSE)
+  fit5=auto.arima(kt5)
+  sim_kt5=ts(replicate(N,simulate(fit5,nsim = 8*n.t)),start = end(kt5)+1)
+  t=seq(3,(8*n.t),by=3)
+  sim_kt5=sim_kt5[t,]
+  #plot(fore_5)
+  #print(kt5_pred)
+  
+
+  
+  Ic=df[(years.pred[1]-1961+1):(tail(years.pred,1)-1961+1),1]
+  
+  
+  ###Construction de la matrice de kt_5
+  I_t=pmax((Ic-a_m),0)
+  m=diag(I_t)
+  t=dim(m)[2]
+  v=c()
+  u=sapply(1:t,function(x){sum(m[,x])})
+  for(i in 1:length(u))
+  {
+    if (u[i]!=0)
+    {
+      v=cbind(v,m[,i])
+    }
+  }
+  I_t=v
+  
+  n.t5=dim(I_t)[2]
+  
+  sim_kt5=sim_kt5[1:n.t5,]
+  
+  
+  ### Gamma
+  #fit_gc=Arima(model$gc,order = c(1,0,0),include.mean = FALSE)
+  fit_gc=auto.arima(model$gc)
+  #pc=forecast(fit_gc,h=150)
+  sim_gc=ts(replicate(N,simulate(fit_gc,nsim = 150)),start = 1951)
+  #gc_pred=pc$mean
+  gc_pred=sim_gc
+  #gg=cbind(model$gc,gc_pred)
+  
+  ### gc
+  #cohort=(years.fit[1]-ages.fit[n.a]):(years.fit[n.y]-ages.fit[1])
+  
+  
+  #ch_beg=years.fit[n.y]+1-ages.fit[n.a] ### start of cohort forecasts
+  #ch_end=years.fit[n.y]+n.t-ages.fit[1] ### end of cohort forecasts
+  #gcc=c(gg[(ch_beg-cohort[1]+1):(1950-cohort[1]+1),1],
+   #     gg[(1950-cohort[1]+2):(ch_end-cohort[1]+1),2])
+  
+  
+  ### Dataframe pour enregistrer les simulations
+  mu_pred=array(dim=c(N,length(ages.fit),length(years.pred)))
+  
+  ### Simuler N scénarios
+  for(i in 1:N)
+  {
+    
+    gg=cbind(model$gc,gc_pred[,i])
+    
+    ### gc
+    cohort=(years.fit[1]-ages.fit[n.a]):(years.fit[n.y]-ages.fit[1])
+    
+    
+    ch_beg=years.fit[n.y]+1-ages.fit[n.a] ### start of cohort forecasts
+    ch_end=years.fit[n.y]+n.t-ages.fit[1] ### end of cohort forecasts
+    gcc=c(gg[(ch_beg-cohort[1]+1):(1950-cohort[1]+1),1],
+          gg[(1950-cohort[1]+2):(ch_end-cohort[1]+1),2])
+    
+    ## Construire la matrice teta
+    ax=model$ax
+    teta=c(ax,sim_kt1[,i],sim_kt2[,i],sim_kt3[,i],sim_kt4[,i],sim_kt5[,i],gcc)
+    
+    x=ages.fit
+    x.bar=mean(x)
+    n=n.a*n.t
+    n.c=n.a+n.t-1
+    
+    
+    #### 1) Matrice d'âge
+    X_a=kronecker(as.matrix(rep(1,n.t)),diag(n.a))
+    #### 2) Matrice de période kt1
+    X_t1=kronecker(diag(n.t),as.matrix(rep(1,n.a)))
+    #### 3) Matrice de période kt2
+    X_t2=kronecker(diag(n.t),as.matrix(x.bar-x))
+    #### 4) Matrice de période kt3
+    X_t3=kronecker(diag(n.t),as.matrix(pmax(x.bar-x,0)))
+    #### 4) Matrice de période kt4
+    X_t4=kronecker(diag(n.t),as.matrix(pmax(x1-x,0)+c*pmax(x-x2,0))^2)
+    #### 5) Matrice de période kt5
+    y=(x-a_c)
+    #y=I(x,a_c)
+    X_t5=kronecker(I_t,as.matrix(pmax(y,0)))
+    ### Matrice de cohorte
+    X_c=indic(matrix(0,n,n.c),n.a,n.t)
+    
+    #### Enfin on obtient
+    X=cbind(X_a,X_t1,X_t2,X_t3,X_t4,X_t5,X_c)
+    mu=X%*%teta
+    
+    log_mu=matrix(mu,nrow = n.a,dimnames =list(ages.fit,years.pred))
+    mod_mu=exp(log_mu)
+    
+    mu_pred[i,,]=mod_mu
+  }
+  
+  
+  mean_pred=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages.fit,years.pred))
+  se_pred=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages.fit,years.pred))
+  IC_min=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages.fit,years.pred))
+  IC_max=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages.fit,years.pred))
+  
+  B=N
+  for (x in 1:dim(mu_pred)[2])
+  {
+    for (y in 1:dim(mu_pred)[3])
+    {
+      mean_pred[x,y]=mean(mu_pred[,x,y])
+      #se_pred[x,y]=sd(mu_pred[,x,y])
+      #IC_min[x,y]=mean(sort(mu_pred[,x,y])[1:500])
+      #IC_max[x,y]=mean(sort(mu_pred[,x,y],decreasing = TRUE)[1:500])
+      se_pred[x,y]=sd(mu_pred[,x,y])
+      IC_min[x,y]=mean_pred[x,y]-1.96*se_pred[x,y]/sqrt(B)
+      IC_max[x,y]=mean_pred[x,y]+1.96*se_pred[x,y]/sqrt(B)
+      
+    }
+  }
+  list(mu_pred=mu_pred,
+       mean_pred=mean_pred,
+       #se_pred=se_pred,
+       IC_min=IC_min,
+       IC_max=IC_max)
+  
+}
+
+
+
+sim_ic_method2=function(mode, ages.fit, years.fit, years.pred, x1, x2, c, a_c=65, N=100)
+{
+  
+  "
+  Simuler plusieurs scénarios de kt1,kt2,... et récupérer les taux de mortalité 
+  correspondants à chaque scénario pour obtenir le taux moyenne sur les N scénarios
+  et le taux moyenne pour les 25% plus bas et 2,5% plus grand.
+  
+  Args:
+    model: modèle plat,spo, modèle proposé,...
+    ages.fit (vecteur): Liste des labels d'âges
+    years.fit (vecteur): Liste des labels d'année d'estimation
+    years.pred (vecteur): Liste des labels d'année de prédiction
+    N (int): Entier pour le nombre de stimulation
+    
+  Return:
+    
+  "
+  n.a=length(ages.fit)
+  n.y=length(years.fit)
+  n.t=length(years.pred)
+  model=mode
+  ### Récupérer les valeurs des paramètres du modèle
+  kt1=model2$kt1
+  kt2=model$kt2
+  kt3=model$kt3
+  kt4=model$kt4
+  kt5=model$kt5
+  gc=model$gc
+  ax=model$ax
+  
+  ### Fiter un auto.arima sur les paramètres
+  #fit1=Arima(kt1, order=c(0,1,0), include.drift = FALSE)
+  #sim_kt1=ts(replicate(N,simulate(fit1,nsim = n.t)),start = end(kt1)+1)
+  
+  #fit2=Arima(kt2, order=c(1,0,0),include.mean = FALSE)
+  #sim_kt2=ts(replicate(N,simulate(fit2,nsim = n.t)),start = end(kt2)+1)
+  
+  
+  #fit3=Arima(kt3, order=c(1,1,0),include.mean = FALSE)
+  #sim_kt3=ts(replicate(N,simulate(fit3,nsim = n.t)),start = end(kt3)+1)
+  
+  #fit4=Arima(kt4, order=c(1,0,0),include.mean = FALSE)
+  #sim_kt4=ts(replicate(N,simulate(fit4,nsim = n.t)),start = end(kt3)+1)
+  
+  fit1=auto.arima(kt1)
+  sim_kt1=ts(replicate(N,simulate(fit1,nsim = n.t)),start = end(kt1))
+  
+  fit2=auto.arima(kt2)
+  sim_kt2=ts(replicate(N,simulate(fit2,nsim = n.t)),start = end(kt2))
+  
+  fit3=auto.arima(kt3)
+  sim_kt3=ts(replicate(N,simulate(fit3,nsim = n.t)),start = end(kt3))
+  
+  fit4=auto.arima(kt4)
+  sim_kt4=ts(replicate(N,simulate(fit4,nsim = n.t)),start = end(kt4))
+  
+  x = seq(from = 1 , to = length(kt5) , by = 1)
+  y = kt5
+  l = Reg(x , y)# Data augmentation by inserting two points.
+  
+  kt5_est=ts(l$y,start=1,frequency = 1)
+  #fit5=Arima(kt5_est,order=c(1,0,0),include.mean = FALSE)
+  fit5=auto.arima(kt5_est)
+  sim_kt5=ts(replicate(N,simulate(fit5,nsim = 8*n.t)),start = end(kt5_est))
+  t=seq(3,(8*n.t),by=3)
+  sim_kt5=sim_kt5[t,]
+  #plot(fore_5)
+  #print(kt5_pred)
+  
+  
+  
+  Ic=df[(years.pred[1]-1961+1):(tail(years.pred,1)-1961+1),1]
+  
+  
+  ###Construction de la matrice de kt_5
+  I_t=pmax((Ic-a_m),0)
+  m=diag(I_t)
+  t=dim(m)[2]
+  v=c()
+  u=sapply(1:t,function(x){sum(m[,x])})
+  for(i in 1:length(u))
+  {
+    if (u[i]!=0)
+    {
+      v=cbind(v,m[,i])
+    }
+  }
+  I_t=v
+  
+  n.t5=dim(I_t)[2]
+  
+  sim_kt5=sim_kt5[1:n.t5,]
+  
+  
+  ### Gamma
+  #fit_gc=Arima(model$gc,order = c(1,0,0),include.mean = FALSE)
+  fit_gc=auto.arima(model$gc)
+  #pc=forecast(fit_gc,h=150)
+  sim_gc=ts(replicate(N,simulate(fit_gc,nsim = 150)),start = 1951)
+  #gc_pred=pc$mean
+  gc_pred=sim_gc
+  #gg=cbind(model$gc,gc_pred)
+  
+  ### gc
+  #cohort=(years.fit[1]-ages.fit[n.a]):(years.fit[n.y]-ages.fit[1])
+  
+  
+  #ch_beg=years.fit[n.y]+1-ages.fit[n.a] ### start of cohort forecasts
+  #ch_end=years.fit[n.y]+n.t-ages.fit[1] ### end of cohort forecasts
+  #gcc=c(gg[(ch_beg-cohort[1]+1):(1950-cohort[1]+1),1],
+  #     gg[(1950-cohort[1]+2):(ch_end-cohort[1]+1),2])
+  
+  
+  ### Dataframe pour enregistrer les simulations
+  mu_pred=array(dim=c(N,length(ages.fit),length(years.pred)))
+  
+  ### Simuler N scénarios
+  for(i in 1:N)
+  {
+    
+    gg=cbind(model$gc,gc_pred[,i])
+    
+    ### gc
+    cohort=(years.fit[1]-ages.fit[n.a]):(years.fit[n.y]-ages.fit[1])
+    
+    
+    ch_beg=years.fit[n.y]+1-ages.fit[n.a] ### start of cohort forecasts
+    ch_end=years.fit[n.y]+n.t-ages.fit[1] ### end of cohort forecasts
+    gcc=c(gg[(ch_beg-cohort[1]+1):(1950-cohort[1]+1),1],
+          gg[(1950-cohort[1]+2):(ch_end-cohort[1]+1),2])
+    
+    ## Construire la matrice teta
+    ax=model$ax
+    teta=c(ax,sim_kt1[,i],sim_kt2[,i],sim_kt3[,i],sim_kt4[,i],sim_kt5[,i],gcc)
+    
+    x=ages.fit
+    x.bar=mean(x)
+    n=n.a*n.t
+    n.c=n.a+n.t-1
+    
+    
+    #### 1) Matrice d'âge
+    X_a=kronecker(as.matrix(rep(1,n.t)),diag(n.a))
+    #### 2) Matrice de période kt1
+    X_t1=kronecker(diag(n.t),as.matrix(rep(1,n.a)))
+    #### 3) Matrice de période kt2
+    X_t2=kronecker(diag(n.t),as.matrix(x.bar-x))
+    #### 4) Matrice de période kt3
+    X_t3=kronecker(diag(n.t),as.matrix(pmax(x.bar-x,0)))
+    #### 4) Matrice de période kt4
+    X_t4=kronecker(diag(n.t),as.matrix(pmax(x1-x,0)+c*pmax(x-x2,0))^2)
+    #### 5) Matrice de période kt5
+    y=(x-a_c)
+    #y=I(x,a_c)
+    X_t5=kronecker(I_t,as.matrix(pmax(y,0)))
+    ### Matrice de cohorte
+    X_c=indic(matrix(0,n,n.c),n.a,n.t)
+    
+    #### Enfin on obtient
+    X=cbind(X_a,X_t1,X_t2,X_t3,X_t4,X_t5,X_c)
+    mu=X%*%teta
+    
+    log_mu=matrix(mu,nrow = n.a,dimnames =list(ages.fit,years.pred))
+    mod_mu=exp(log_mu)
+    
+    mu_pred[i,,]=mod_mu
+  }
+  
+  
+  mean_pred=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages.fit,years.pred))
+  se_pred=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages.fit,years.pred))
+  IC_min=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages.fit,years.pred))
+  IC_max=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages.fit,years.pred))
+  
+  B=N
+  for (x in 1:dim(mu_pred)[2])
+  {
+    for (y in 1:dim(mu_pred)[3])
+    {
+      mean_pred[x,y]=mean(mu_pred[,x,y])
+      #se_pred[x,y]=sd(mu_pred[,x,y])
+      #IC_min[x,y]=mean(sort(mu_pred[,x,y])[1:500])
+      #IC_max[x,y]=mean(sort(mu_pred[,x,y],decreasing = TRUE)[1:500])
+      se_pred[x,y]=sd(mu_pred[,x,y])
+      IC_min[x,y]=mean_pred[x,y]-1.96*se_pred[x,y]/sqrt(B)
+      IC_max[x,y]=mean_pred[x,y]+1.96*se_pred[x,y]/sqrt(B)
+      
+    }
+  }
+  list(mu_pred=mu_pred,
+       mean_pred=mean_pred,
+       #se_pred=se_pred,
+       IC_min=IC_min,
+       IC_max=IC_max)
+  
+}
+
+
 
 
 

@@ -1,0 +1,162 @@
+
+
+```{r}
+library(StMoMo)
+library(demography)
+```
+
+
+```{r}
+data <- read.demogdata("Mx_1x1.txt","Exposures_1x1.txt", type="mortality", label="France")
+FraMaleData=StMoMoData(data, series = names(data$rate)[2], type ="central")
+FraFemaleData=StMoMoData(data, series = names(data$rate)[1], type ="central")
+```
+
+
+
+```{r}
+f2=function(x,ages) mean(ages)-x
+f3=function(x,ages) pmax(0,mean(ages)-x)#+(pmax(0,a-x))^2
+f4=function(x,ages) ((-0.499*pmax(x-49,0))^2+(0.737*(pmax(x-48,0)))^2)
+#f5=function(x,ages) cx[a+1]*pmax(0,x-a)^2
+
+constSPO=function(ax, bx, kt, b0x, gc, wxt, ages)
+{
+  nYears=dim(wxt)[2]
+  x=ages
+  t=1:nYears
+  xbar=mean(ages,na.rm=T) 
+  c=(1-tail(ages,1)):(nYears-ages[1])
+  
+  phireg=lm(gc~1+c+I(c^2),na.action = na.omit)
+  phi=coef(phireg)
+  
+  gc=gc-phi[1]-phi[2]*c-phi[3]*c^2
+  kt[1,]=kt[1,]+phi[2]*t+phi[3]*(t^2-2*xbar*t)
+  kt[2,]=kt[2,]+2*phi[3]*t
+  ax=ax+phi[1]-phi[2]*x+phi[3]*x^2
+  
+  ci=rowMeans(kt,na.rm = TRUE)
+  
+  kt[1,]=kt[1,]-ci[1]
+  kt[2,]=kt[2,]-ci[2]
+  kt[3,]=kt[3,]-ci[3]
+  kt[4,]=kt[4,]-ci[4]
+  #kt[5,]=kt[5,]-ci[5]
+  ax=ax+ci[1]+ci[2]*(xbar-x)+ci[3]*pmax(xbar-x,0)+ci[4]*((-0.499*pmax(x-49,0))^2+(0.737*(pmax(x-48,0)))^2)     
+  
+  list(ax=ax,bx=bx,kt=kt,b0x=b0x,gc=gc)
+}
+SPO=StMoMo(link="log",staticAgeFun = TRUE,periodAgeFun = c("1",f2,f3,f4),constFun = constSPO,cohortAgeFun = "1")
+```
+
+
+
+```{r}
+### Modèle SPO avec la température moyenne annuelle
+#a=46
+#cx=corpe_male_temp[,1]
+ages.fit=0:100
+years.fit=1950:2017
+wxt=genWeightMat(ages=ages.fit,years=years.fit)
+SPOMale_mean=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+
+
+```{r}
+### Les critères du modèle
+print(c(AIC(SPOMale_mean),BIC(SPOMale_mean),SPOMale_mean$deviance,mape(SPOMale_mean)))
+```
+
+```{r}
+plot(SPOMale_mean,parametricbx=F,nCol=4)
+```
+
+
+
+```{r}
+fore_=forecast(SPOMale_mean,kt.method = "iarima")
+plot(fore_,only.kt=T)
+```
+
+
+```{r}
+fore_=forecast(SPOMale_mean,h=50,kt.method = "iarima")
+plot(fore_$rates[8,])
+```
+
+
+```{r}
+fitgc=auto.arima(SPOMale_mean$gc)
+fitgc
+```
+
+
+
+
+
+```{r}
+
+SPO_sim=simulate(SPOMale_mean,nsim = 5000,h=80,gc.order = c(4,0,4))
+
+
+qxt <- SPOMale_mean$Dxt / SPOMale_mean$Ext
+plot(SPOMale_mean$years, qxt["75", ], xlim = range(SPOMale_mean$years, SPO_sim$years), ylim = range(qxt["75", ], SPO_sim$rates["75", , 1:50]), type = "l", xlab = "year", ylab = "rate", main = "Mortality rates at age 75")
+
+matlines(SPO_sim$years, SPO_sim$rates["75", , 1:500], type = "l", lty = 1)
+
+```
+
+
+```{r}
+SPO_sim$rates[75,1,1:10]
+```
+
+```{r}
+dim(SPO_sim$rates)
+```
+
+
+
+```{r}
+m_min=c()
+m_max=c()
+mean_=c()
+for (i in 1:dim(SPO_sim$rates)[2])
+{
+  mean_[i]=mean(SPO_sim$rates['70',i,])
+  stdr=sd(SPO_sim$rates['70',i,])
+  m_min[i]=mean_[i]-1.96*stdr/sqrt(5000)
+  m_max[i]=mean_[i]+1.96*stdr/sqrt(5000)
+}
+```
+
+
+```{r}
+plot(mean_,type='l')
+lines(m_min)
+```
+
+
+
+```{r}
+mean_sp=mean(SPO_sim$rates[75,,])
+```
+
+
+```{r}
+library(fanplot)
+probs = c(2.5, 10, 25, 50, 75, 90, 97.5)
+matplot(SPOMale_mean$years, t(qxt[c(m_min[i]=mean_-1.96*stdr/sqrt(500) "85"), ]),
+        xlim = c(1960, 2061), ylim = c(0.0025, 0.2), pch = 20, col = "black",
+        log = "y", xlab = "year", ylab = "mortality rate (log scale)")
+fan(t(SPO_sim$rates["85", , ]), start = 2017, probs = probs, n.fan = 4,
+    fan.col = colorRampPalette(c("red", "white")), ln = NULL)
+```
+
+
+
+
+
+

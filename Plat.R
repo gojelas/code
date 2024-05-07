@@ -272,14 +272,8 @@ get_estimation_plat=function(data, ages, years)
     kt1=plat$kt1,
     kt2=plat$kt2,
     kt3=plat$kt3,
-    #kt4=m2$kt4,
-    #kt5=m2$kt5,
     ax=plat$ax,
     gc=plat$gc
-    #a_m=a_m,
-    #x1=x1,
-    #x2=x2,
-    #c=c
   )
 }
 
@@ -376,12 +370,11 @@ boost_echant=function(data,ages,years,B=1000)
                (years_head-data_years_head+1):(years_tail-data_years_head+1)]
   
   Dxt_b=array(dim = c(B,dim(Dxt)[1],dim(Dxt)[2]))
-  for(x in 1:B){
-    for(a in 1:dim(Dxt)[1]){
-      for(b in 1:dim(Dxt)[2])
-      {
-        Dxt_b[x,a,b]=rpois(1,Dxt[a,b])
-      }
+  #for(x in 1:B){
+  for(a in 1:dim(Dxt)[1]){
+    for(b in 1:dim(Dxt)[2])
+    {
+      Dxt_b[,a,b]=rpois(B,Dxt[a,b])
     }
   }
   Dxt_b
@@ -391,7 +384,11 @@ boost_echant=function(data,ages,years,B=1000)
 
 inf_conf_plat=function(data,ages,years,years_pred,B=50)
 {
-  dxt=boost_echant(data,0:110,1816:2020,B)
+  a_min=data$ages[1]
+  a_max=tail(data$ages,1)
+  y_min=data$years[1]
+  y_max=tail(data$years,1)
+  dxt=boost_echant(data,a_min:a_max,y_min:y_max,B)
   mu_pred=array(dim=c(B,length(ages),length(years_pred)))
   
   data$Dxt=dxt[1,,]
@@ -436,13 +433,13 @@ inf_conf_plat=function(data,ages,years,years_pred,B=50)
 
 
 
-IC_plat=inf_conf_plat(FraMaleData,20:85,1980:2011,2012:2019,B = 1000)
+IC_plat=inf_conf_plat(FraMaleData,20:85,1980:2011,2012:2019,B = 100)
 
 
 plat=get_estimation_plat(FraMaleData,20:85,1980:2011)
 mu_pred=get_predict_plat(plat,2012:2019)$mxt_pred
 
-a=60
+a=50
 plot(ts(mu_pred[a,],start = 2012),col=1)
 lines(ts(IC_plat$IC_max[a,],start = 2012),col=2)
 lines(ts(IC_plat$mean_pred[a,],start = 2012),col=3)
@@ -474,17 +471,31 @@ mape_plat
 
 
 
+data_usa <- read.demogdata("/Users/gojelastat/Desktop/Thèse/Thèse/Données/USA/Mx_1x1.txt",
+                       "/Users/gojelastat/Desktop/Thèse/Thèse/Données/USA/Exposures_1x1.txt", 
+                       type="mortality", label="USA")
 
-ages.fit=20:85
-years.fit=1980:2011
-fr_m=FraMaleData$Dxt[21:86,(1980-1816+1):(2011-1816+1)]
-fr_e=FraMaleData$Ext[21:86,(1980-1816+1):(2011-1816+1)]
+USAMaleData=StMoMoData(data_usa, series = names(data_usa$rate)[2], type ="central")
+
+ages.fit=20:84
+years.fit=1961:2005
+us_m=USAMaleData$Dxt[21:85,(1961-1933+1):(2005-1933+1)]
+us_e=USAMaleData$Ext[21:85,(1961-1933+1):(2005-1933+1)]
 wei=genWeightMat(ages=ages.fit,years=years.fit)
-plat=plat_function(fr_m,fr_e,wei,ages.fit,years.fit)
+plat=plat_function(us_m,us_e,wei,ages.fit,years.fit)
 
-dxt_est=fit_model(plat,20:85,1980:2011)$Dxt_fit
+dxt_est=fit_model(plat,20:84,1961:2005)$Dxt_fit
 
 I=information_plat(dxt_est,ages.fit,years.fit)
 
 
+IC_plat=inf_conf_plat(USAMaleData,20:84,1961:2005,2006:2019,B = 500)
 
+plat=get_estimation_plat(USAMaleData,20:84,1961:2005)
+mu_pred=get_predict_plat(plat,2006:2019)$mxt_pred
+
+a=
+plot(ts(mu_pred[a,],start = 2012),col=1)
+lines(ts(IC_plat$IC_max[a,],start = 2012),col=2)
+lines(ts(IC_plat$mean_pred[a,],start = 2012),col=3)
+lines(ts(IC_plat$IC_min[a,],start = 2012),col=4)

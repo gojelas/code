@@ -561,7 +561,7 @@ information_plat=function(dxt_est,ages.fit,years.fit)
   alpha_kt3=i_alpha_kt3(dxt_est,ages.fit,years.fit)
   alpha_gamma=i_alpha_gamma(dxt_est,ages.fit,years.fit)
   
-  l1=cbind(alpha,alpha_kt1,alpha_kt2,alpha_kt3,alpha_gamma)
+  l1=cbind(alpha,alpha_kt1,alpha_kt2,alpha_kt3)#,alpha_gamma)
   
   ### Second line 
   kt1_alpha=t(alpha_kt1)
@@ -570,7 +570,7 @@ information_plat=function(dxt_est,ages.fit,years.fit)
   kt1_kt3=i_kt1_kt3(dxt_est,ages.fit,years.fit)
   kt1_gamma=i_kt1_gamma(dxt_est,ages.fit,years.fit)
   
-  l2=cbind(kt1_alpha,kt1,kt1_kt2,kt1_kt3,kt1_gamma)
+  l2=cbind(kt1_alpha,kt1,kt1_kt2,kt1_kt3)#,kt1_gamma)
   
   ### Third line
   kt2_alpha=t(alpha_kt2)
@@ -579,7 +579,7 @@ information_plat=function(dxt_est,ages.fit,years.fit)
   kt2_kt3=i_kt2_kt3(dxt_est,ages.fit,years.fit)
   kt2_gamma=i_kt2_gamma(dxt_est,ages.fit,years.fit)
   
-  l3=cbind(kt2_alpha,kt2_kt1,kt2,kt2_kt3,kt2_gamma)
+  l3=cbind(kt2_alpha,kt2_kt1,kt2,kt2_kt3)#,kt2_gamma)
   
   ### Fourth line
   kt3_alpha=t(alpha_kt3)
@@ -588,7 +588,7 @@ information_plat=function(dxt_est,ages.fit,years.fit)
   kt3=i_kt3(dxt_est,ages.fit,years.fit)
   kt3_gamma=i_kt3_gamma(dxt_est,ages.fit,years.fit)
   
-  l4=cbind(kt3_alpha,kt3_kt1,kt3_kt2,kt3,kt3_gamma)
+  l4=cbind(kt3_alpha,kt3_kt1,kt3_kt2,kt3)#,kt3_gamma)
   
   ### Fifth line
   gamma_alpha=t(alpha_gamma)
@@ -599,7 +599,7 @@ information_plat=function(dxt_est,ages.fit,years.fit)
   
   l5=cbind(gamma_alpha,gamma_kt1,gamma_kt2,gamma_kt3,gamma)
   
-  inf_matrix_plat=rbind(l1,l2,l3,l4,l5)
+  inf_matrix_plat=rbind(l1,l2,l3,l4)#,l5)
   
   
   inf_matrix_plat
