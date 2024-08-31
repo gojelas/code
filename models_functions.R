@@ -1750,7 +1750,7 @@ sim_ic_method2=function(model, ages.fit, years.fit, years.pred, x1, x2, c,
 
 
 sim_ic_method_new_model=function(model, ages.fit, years.fit, years.pred, x1, x2, c, 
-                        a_c=65, N=100,i,method="ARIMAX")
+                        a_c=65, N=100,i=1,method="ARIMAX")
 {
   
   "
@@ -1770,6 +1770,19 @@ sim_ic_method_new_model=function(model, ages.fit, years.fit, years.pred, x1, x2,
   Return:
     
   "
+  
+  #model=model_m_new
+  #years.fit=1980:2011
+  #ages.fit = 20:85
+  #years.pred = 2012:2030
+  
+  #x1=45
+  #x2=60
+  #c=.58
+  #a_c=65
+  #N=50
+  #i=1
+  #method="ARIMAX"
   n.a=length(ages.fit)
   n.y=length(years.fit)
   n.t=length(years.pred)
@@ -1803,6 +1816,7 @@ sim_ic_method_new_model=function(model, ages.fit, years.fit, years.pred, x1, x2,
   
   sim_kt=replicate(N,simulate(mrwd_kt,nsim=n.t))
   
+  #matplot(sim_kt)
   
   x = seq(from = 1 , to = length(kt5))
   y = kt5
@@ -1832,36 +1846,36 @@ sim_ic_method_new_model=function(model, ages.fit, years.fit, years.pred, x1, x2,
   I_t_est = I_t_est[I_t_est>0]
   
   
-  
   if (method=="ARIMAX")
   {
+    amy2 = I_t_est
+    amx2 = seq(1, length(I_t_est))
+    log2 = Reg(amx2, amy2, h=1)
+    I_t_est=ts(log2$y, start = 1, frequency = 1)
     
-    y2 = I_t_est
-    x2 = seq(1, length(I_t_est))
-    l2 = Reg(x2, y2, 1)
-    I_t_est=ts(l2$y, start = 1, frequency = 1)
-    
-    y3 = I_t_pred
-    x3 = seq(1, length(I_t_pred))
-    l3 = Reg(x3, y3, 1) # Augmentation des points de I_t_pred
-    I_t_pred=ts(l3$y, start = 1, frequency = 1)
+    amy3 = c(tail(I_t_est,1),I_t_pred)
+    amx3 = seq(1, length(amy3))
+    log3 = Reg(amx3, amy3, h=1) # Augmentation des points de I_t_pred
+    I_t_pred=ts(log3$y[2:length(log3$y)], start = 1, frequency = 1)
 
     
-    data3=ts(cbind(kt5_est,I_t_est), start = 1)
-    fit_1=auto.arima(data3[,"kt5_est"], xreg = data3[,"I_t_est"])
+    dat3=ts(cbind(kt5_est,I_t_est), start = 1)
+    fit_1=auto.arima(dat3[,"kt5_est"], xreg = dat3[,"I_t_est"])
     
     sim_kt5=ts(replicate(N,simulate(fit_1,nsim = length(I_t_pred),
                                     xreg = I_t_pred)),start = end(kt5_est))
     #forecast_values=forecast(fit1,xreg = I_t_pred)
-    t=seq(1,length(I_t_pred),by=2)
-    sim_kt5=sim_kt5[t,]
-    matplot(sim_kt5)
+    tu=seq(2,length(I_t_pred),by=2)
+    sim_kt5=sim_kt5[tu,]
+    #colMeans(sim_kt5)
+    #matplot(sim_kt5)
     #kt5_pred= forecast_values$mean[t]
   } else if(method=="ARIMA"){
     fit_1=auto.arima(kt5_est)
     sim_kt5=ts(replicate(N,simulate(fit_1,nsim = length(I_t_pred)*2)),start = end(kt5_est))
     t=seq(1,(length(I_t_pred)*2),by=2)
     sim_kt5=sim_kt5[t,]
+    
     #fore_5=forecast(fit5,20*h)
     #t=seq(2,(20*h),by=2)
     #kt5_pred=fore_5$mean[t]
@@ -1872,10 +1886,13 @@ sim_ic_method_new_model=function(model, ages.fit, years.fit, years.pred, x1, x2,
   
   
   
-  Ic=df[(years.pred[1]-1961+1):(tail(years.pred,1)-1961+1),i]
+  #Ic=df[(years.pred[1]-1961+1):(tail(years.pred,1)-1961+1),i]
   
   ###Construction de la matrice de kt_5
   #I_t=pmax((Ic-a_m),0)
+  Ic = df[(years.pred[1]-1961+1):(tail(years.pred,1)-1961+1),i]
+  a_m = model$a_m
+  
   I_t = indicatrice_It(Ic, a_m)
   m=diag(I_t)
   t=dim(m)[2]
@@ -1891,10 +1908,10 @@ sim_ic_method_new_model=function(model, ages.fit, years.fit, years.pred, x1, x2,
   I_t=v
   
   n.t5=dim(I_t)[2]
-  I_t
   sim_kt5=sim_kt5[1:n.t5,]
   #matplot(sim_kt5)
-  plot(colMeans(sim_kt5))
+  #plot(sim_kt5[,7],type="l")
+  #plot(colMeans(sim_kt5),type="l")
   #sim_kt5=kt5_pred[1:n.t5]
   
   ### Gamma
@@ -2002,6 +2019,16 @@ sim_ic_method_new_model=function(model, ages.fit, years.fit, years.pred, x1, x2,
 }
 
 
+a=6
+probs = c(90, 95)
+r=ts(rate_m[a,years_start:years_end],start = 2000)
+#text(0.5,0.5,"",cex=2,font=2)
+plot(r,col=1,xlim=c(2000,2050),
+     xlab="years",ylab="central mortality rate",main="Male-age 25")
+fan(mu_pred[,(a),],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
 
 
 
