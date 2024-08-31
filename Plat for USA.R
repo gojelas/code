@@ -44,8 +44,8 @@ plat_function=function(dxt,ext,wxt,ages,years)
   X_c=indic(matrix(0,n,n.c),n.a,n.t)
   
   ### consider cohort that under 1950 years
-  n.s=1946-cohort[1]+1 
-  X_c=X_c[,1:n.s]
+  #n.s=1946-cohort[1]+1 
+  #X_c=X_c[,1:n.s]
   n.s=dim(X_c)[2]
   X=cbind(X_a,X_t1,X_t2,X_t3,X_c)
   
@@ -236,10 +236,12 @@ us_e=USAMaleData$Ext[21:85,(1961-1933+1):(2005-1933+1)]
 wei=genWeightMat(ages=ages.fit,years=years.fit)
 plat=plat_function(us_m,us_e,wei,ages.fit,years.fit)
 
+get_criterion(plat,data = USAMaleData,ages.fit = ages.fit,years.fit)
 
 plot(plat$gc)
 fit1=Arima(plat$gc,order = c(1,0,0),include.mean = FALSE)
 fit1
+matplot(cbind(fit1,replicate(n = 10,simulate(fit1,nsim = 50))),type='l')
 
 
 sim_ic_method=function(model, ages.fit, years.fit, years.pred, N=100)
@@ -364,7 +366,7 @@ sim_ic_method=function(model, ages.fit, years.fit, years.pred, N=100)
 }
 
 
-m = sim_ic_method(plat, ages.fit = 20:84, years.fit = 1961:2005, years.pred = 2006:2050, N = 10000)
+m = sim_ic_method(plat, ages.fit = 20:84, years.fit = 1961:2005, years.pred = 2006:2050, N = 100)
 
 IC_plat = m
 

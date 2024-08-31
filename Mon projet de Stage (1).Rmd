@@ -1,0 +1,1297 @@
+---
+title: "Projet Stage"
+author: "Jean-Luc"
+date: "2023-05-27"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+\### Modélisation
+
+\#### Modèle de Lee Carter
+
+```{r}
+library(StMoMo)
+library(demography)
+```
+
+```{r}
+data <- read.demogdata("Mx_1x1.txt","Exposures_1x1.txt", type="mortality", label="France")
+FraMaleData=StMoMoData(data, series = names(data$rate)[2], type ="central")
+FraFemaleData=StMoMoData(data, series = names(data$rate)[1], type ="central")
+```
+
+```{r}
+FraFemaleData
+```
+
+```{r}
+male_rate=data$rate$male
+female_rate=data$rate$female
+total_rate=data$rate$total
+```
+
+```{r}
+plot(female_rate[1:101,135],type='l',ylab='Taux de mortalité',xlab='Age',lwd=2,col="red",main='Taux de mortalité chez les femmes de 1950 à 2019')
+for (i in 136:203)
+{
+  lines(female_rate[1:101,i],col="8")
+}
+lines(female_rate[1:101,204],lwd=1.5)
+legend(x=0,y=0.5,legend = c('1950',">1950 & <2019","2019"),
+       col=c('red',8,"black"),lwd=1.5,cex=0.7)
+
+```
+
+
+```{r}
+plot(log(female_rate[1:101,135]),type='l',
+     ylab='Taux de mortalité',xlab='Age',lwd=2,col="red",
+     main='Taux de mortalité chez les femmes de 1950 à 2019')
+for (i in 136:203)
+{
+  lines(log(female_rate[1:101,i]),col="8")
+}
+lines(log(female_rate[1:101,204]),lwd=1.5)
+legend(x=0,y=0,legend = c('1950',">1950 & <2019","2019"),
+       col=c('red',8,"black"),lwd=1.5,cex=0.7)
+
+
+```
+
+```{r}
+
+male=sapply(1:101,function(x){mean(male_rate[x,135:204])})
+plot(log(male),type='l',
+     ylab='log_mxt',xlab='Age',lwd=2,col="red",
+     main='log-mortalité chez les hommes')
+
+```
+
+```{r}
+par(mfrow=c(2,1))
+plot(male_rate[16,135:204],type='l',ylim=c(0.0001,0.001),col="red",ylab = "mortality_rate_15",xlab = 'Année',xlim=c(1950,2019))
+plot(male_rate[36,135:204],type='l',ylim=c(0.0006,0.0025),col="red",ylab = "mortality_rate_35",xlab = 'Année',xlim=c(1950,2019))
+#plot(male_rate[56,135:204],col="red",ylab = "mortality_rate_55",xlab = 'Année',xlim=c(1950,2019))
+#plot(male_rate[76,135:204],col="red",ylab = "mortality_rate_75",xlab = 'Année',xlim=c(1950,2019))
+```
+
+```{r}
+plot(male_rate[50,],ylim=c(0.0005,0.09),type='l')
+lines(male_rate[40,],col=2)
+lines(male_rate[60,],col=3)
+lines(male_rate[70,],col=4)
+lines(male_rate[30,],col=5)
+```
+
+```{r}
+### Fonction de calcul du MAPE
+mape=function(model)
+{
+  model_dxt=fitted(model,type = "deaths")
+  ext=model$Ext
+  dxt=model$Dxt
+  mx_fit=model_dxt/ext
+  mx=dxt/ext
+  mape=mean(abs((mx_fit-mx)/mx))
+  mape
+}
+
+```
+
+```{r}
+constLC=function(ax, bx, kt, b0x, gc, wxt, ages)
+{
+  c1=mean(kt[1,],na.rm=TRUE)
+  c2=sum(bx[,1],na.rm=TRUE)
+  list(ax=ax+c1*bx,bx=bx/c2,kt=c2*(kt-c1))
+}
+LC=StMoMo(link = "log",staticAgeFun = TRUE,periodAgeFun = "NP",constFun =constLC )
+```
+
+```{r}
+### MAPE male
+print(c(AIC(LCfit),BIC(LCfit),LCfit$deviance,mape(LCfit)))
+```
+
+```{r}
+#### Graphique des résidus de LC
+resLC=residuals(LCfit)
+plot(resLC,type="scatter",col='red',reslim = c(-4,4))
+```
+
+```{r}
+
+```
+
+```{r}
+resLCf=residuals(LCfitf)
+plot(resLCf,type="scatter",col='blue',reslim=c(-4,4))
+```
+
+```{r}
+### A titre d'exemple pour voir l'anomalie dans la représentation des données
+ages.fit=0:100
+years.fit=1950:2015
+wxt=genWeightMat(ages=ages.fit,years=years.fit)
+LCfit=fit(LC,data=FraMaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+LCfit=fit(LC,data=FraMaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+
+```{r}
+par(mfrow=c(1,2))
+plot(LCfit$ax,ylab='ax',xlab='age',type='l',col="red")
+plot(ts(LCfit$kt[1,],start=1950,frequency = 1),type='l',col="red",ylab='kt1')
+```
+
+```{r}
+ages.fit=0:100
+years.fit=1950:2015
+wxt=genWeightMat(ages=ages.fit,years=years.fit)
+LCfitf=fit(LC,data=FraFemaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+plot(LCfitf,parametricbx=F,nCol=3,col="blue")
+```
+
+```{r}
+### Représentation des données réelles LC_estimés de 2023 
+LC_dxt=fitted(LCfit,type = "deaths")
+Dxt=LCfit$Dxt
+plot(LC_dxt[,54],type='l',x=ages.fit)
+lines(Dxt[,54],x=ages.fit)
+```
+
+```{r}
+print(c(AIC(LCfitf),BIC(LCfitf),LCfitf$deviance,mape(LCfitf)))
+```
+
+```{r}
+### Erreur MAPE
+LC_uxt=fitted(LCfit,type = "rates")
+mx=LCfit$Dxt/LCfit$Ext
+LC_mape=mean(abs((mx-LC_uxt)/mx))
+LC_mape
+```
+
+### Modèle RH
+
+```{r}
+RH=rh(link="log")
+ages.fit=0:100
+years.fit=1950:2015
+wxt=genWeightMat(ages=ages.fit,years=years.fit)
+RHfit=fit(RH,data=FraMaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+plot(RHfit,parametricbx = F,nCol = 2,col='red')
+```
+
+```{r}
+###Graphique des résidus
+resRH=residuals(RHfit)
+plot(resRH,type="scatter",col='red',reslim = c(-4,4))
+```
+
+```{r}
+print(c(AIC(RHfit),BIC(RHfit),RHfit$deviance,mape(RHfit)))
+```
+
+```{r}
+RH=rh(link="log")
+ages.fit=0:100
+years.fit=1950:2015
+wxt=genWeightMat(ages=ages.fit,years=years.fit)
+RHfitf=fit(RH,data=FraFemaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+plot(RHfitf,parametricbx = F,nCol = 2,col='blue')
+```
+
+```{r}
+resRHf=residuals(RHfitf)
+plot(resRHf,type="scatter",col='blue',reslim=c(-4,4))
+```
+
+```{r}
+print(c(AIC(RHfitf),BIC(RHfitf),RHfitf$deviance,mape(RHfitf)))
+```
+
+### Modèle APC
+
+```{r}
+
+```
+
+```{r}
+APC=apc(link="log")
+APCfit=fit(APC,data=FraMaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+plot(APCfit,nCol = 3, parametricbx = F,col="red")
+
+```
+
+```{r}
+resAPC=residuals(APCfit)
+plot(resAPC,type="scatter",col='red',reslim=c(-4,4))
+```
+
+```{r}
+print(c(AIC(APCfit),BIC(APCfit),APCfit$deviance,mape(APCfit)))
+```
+
+```{r}
+APC=apc(link="log")
+APCfitf=fit(APC,data=FraFemaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+plot(APCfitf,nCol = 3, parametricbx = F,col="blue")
+```
+
+```{r}
+### Critère de sélection
+print(c(AIC(APCfitf),BIC(APCfitf),APCfitf$deviance,mape(APCfitf)))
+```
+
+```{r}
+### Représentation des données réelles LC_estimés de 2023 
+APC_dxt=fitted(APCfit,type = "deaths")
+Dxt=APCfit$Dxt
+plot(APC_dxt[,54],type='l',x=ages.fit)
+lines(Dxt[,54],x=ages.fit)
+```
+
+```{r}
+
+```
+
+### Modèle CBD
+
+```{r}
+CBD=cbd()
+CBDfit=fit(CBD,data=FraMaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+plot(CBDfit,parametricbx = F,nCol = 2,col='red')
+```
+
+### Modèle de PLAT
+
+```{r}
+f3=function(x,ages) mean(ages)-x
+
+f4=function(x,ages) pmax(0,mean(ages)-x)
+
+constPL=function(ax, bx, kt, b0x, gc, wxt, ages)
+
+{
+
+  nYears=dim(wxt)[2]
+
+  x=ages
+
+  t=1:nYears
+
+  xbar=mean(ages,na.rm=T)
+
+  c=(1-tail(ages,1)):(nYears-ages[1])
+
+  
+
+  phireg=lm(gc~1+c+I(c^2),na.action = na.omit)
+
+  phi=coef(phireg)
+
+  
+
+  gc=gc-phi[1]-phi[2]*c-phi[3]*c^2
+
+  kt[1,]=kt[1,]+phi[2]*t+phi[3]*(t^2-2*xbar*t)
+
+  kt[2,]=kt[2,]+2*phi[3]*t
+
+  kt[3,]=kt[3,]
+
+  ax=ax+phi[1]-phi[2]*x+phi[3]*x^2
+
+  
+
+  ci=rowMeans(kt,na.rm = TRUE)
+
+  kt[1,]=kt[1,]-ci[1]
+
+  kt[2,]=kt[2,]-ci[2]
+
+  kt[3,]=kt[3,]-ci[3]
+
+  ax=ax+ci[1]+ci[2]*(xbar-x)+ci[3]*(pmax(xbar-x,0))
+
+  
+
+  list(ax=ax,bx=bx,kt=kt,b0x=b0x,gc=gc)
+
+}
+
+PLAT=StMoMo(link="log",staticAgeFun = TRUE,periodAgeFun = c("1",f3,f4),constFun = constPL,cohortAgeFun = "1")
+```
+
+```{r}
+ages.fit=20:85
+years.fit=1974:2006
+wxt=genWeightMat(ages=ages.fit,years=years.fit)
+PLATfit=fit(PLAT,data=UKMaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+plot(PLATfit,parametricbx = F,nCol = 3,col="red")
+```
+
+
+
+
+
+```{r}
+PLATsim=simulate(PLATfit,nsim = 500,h=50,gc.order = c(5,1,4))
+```
+
+```{r}
+qxt <- PLATfit$Dxt / PLATfit$Ext
+plot(PLATfit$years, qxt["85", ], xlim = range(PLATfit$years, PLATsim$years), ylim = range(qxt["85", ], PLATsim$rates["85", , 1:50]), type = "l", xlab = "year", ylab = "rate", main = "Mortality rates at age 75")
+
+matlines(PLATsim$years, PLATsim$rates["85", , 1:50], type = "l", lty = 1)
+```
+
+
+```{r}
+plot(PLATfit$years, PLATfit$kt[3,], xlim = c(1950,2050), ylim = range(-0.1,0.1), type = "l", xlab = "year", ylab = "kt",main = "Cohort index (ARIMA(1,1,0) with drift)")
+matlines(PLATsim$kt.s$years, PLATsim$kt.s$sim[3,, 1:500], type = "l", lty = 1)
+```
+
+
+
+
+
+
+```{r}
+resPlat=residuals(PLATfit)
+plot(resPlat,type="scatter",col='red',reslim=c(-4,4))
+```
+
+```{r}
+print(c(AIC(PLATfit),BIC(PLATfit),PLATfit$deviance,mape(PLATfit)))
+```
+
+```{r}
+#Female
+PLATfitf=fit(PLAT,data=FraFemaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+plot(PLATfitf,parametricbx = F,nCol = 3,col="blue")
+```
+
+```{r}
+resPlatf=residuals(PLATfitf)
+plot(resPlatf,type="scatter",col='blue',reslim=c(-4,4))
+```
+
+```{r}
+print(c(AIC(PLATfitf),BIC(PLATfitf),PLATfitf$deviance,mape(PLATfitf)))
+```
+
+```{r}
+### Crière de sélection
+#print(c(AIC(PLATfit),BIC(PLATfit),PLATfit$deviance))#mape(PLATfit)))
+fore_pl=forecast(PLATfit,kt.method = "iarima")
+plot(fore_pl,only.kt = T)
+```
+
+```{r}
+a=25
+mx=PLATfit$Dxt/PLATfit$Ext
+mx_pred=ts(fore_pl$rates[a,],start=2020,frequency = 1)
+plot(ts(mx[a,],start=1950,frequency = 1),type='l',xlim=c(1950,2040),ylim=c(0.05,0.4))
+lines(mx_pred,col=3)
+#lines(ts(mspo[a,],start=1950,frequency = 1),col=2)
+```
+
+```{r}
+### Représentation des données réelles LC_estimés de 2023 
+PLAT_dxt=fitted(PLATfit,type = "deaths")
+Dxt=PLATfit$Dxt
+plot(PLAT_dxt[,54],type='l',x=ages.fit)
+lines(Dxt[,54],x=ages.fit)
+```
+
+### Modèle OAL
+
+```{r}
+f1=function(x,ages) mean(ages,na.rm = T)-x
+
+f2=function(x,ages) pmax(mean(ages)-x,0)+(pmax(mean(ages)-x,0))^2
+
+constOAL=function( ax, bx, kt, b0x, gc, wxt, ages)
+
+{
+
+  nYears=dim(wxt)[2]
+
+  t=1:nYears
+
+  x=ages
+
+  xbar=mean(ages)
+
+  c=(1-tail(ages,1)):(nYears-ages[1])
+
+  phireg=lm(gc~1+c+I(c^2),na.action = na.omit)
+
+  phi=coef(phireg)
+
+  ax=ax+phi[1]-phi[2]*x+phi[3]*x^2
+
+  kt[1,]=kt[1,]+phi[2]*t+phi[3]*(t^2-2*xbar*t)
+
+  kt[2,]=kt[2,]+2*phi[3]*t
+
+  gc=gc-phi[1]-phi[2]*c-phi[3]*c^2
+
+  
+
+  ci=rowMeans(kt,na.rm = T)
+
+  ax=ax+ci[1]+ci[2]*(xbar-x)+ci[3]*(pmax(xbar-x,0)+(pmax(xbar-x,0))^2)
+
+  kt[1,]=kt[1,]-ci[1]
+
+  kt[2,]=kt[2,]-ci[2]
+
+  kt[3,]=kt[3,]-ci[3]
+
+  
+
+  list(ax=ax,bx=bx,kt=kt,b0x=b0x,gc=gc)
+
+}
+
+OAL=StMoMo(link='log',staticAgeFun = T,periodAgeFun = c("1",f1,f2),cohortAgeFun = '1',constFun = constOAL)
+
+```
+
+```{r}
+ages.fit=0:100
+years.fit=1950:2015
+wxt=genWeightMat(ages=ages.fit,years=years.fit)
+OALfit=fit(OAL,data=FraMaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+plot(OALfit,parametricbx = F,nCol = 3,col="red")
+```
+
+```{r}
+print(c(AIC(OALfit),BIC(OALfit),OALfit$deviance,mape(OALfit)))
+```
+
+```{r}
+ages.fit=0:100
+years.fit=1950:2015
+wxt=genWeightMat(ages=ages.fit,years=years.fit)
+OALfitf=fit(OAL,data=FraFemaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+plot(OALfitf,parametricbx = F,nCol = 3,col="blue")
+```
+
+```{r}
+print(c(AIC(OALfitf),BIC(OALfitf),OALfitf$deviance,mape(OALfitf)))
+```
+
+```{r}
+fore_oal=forecast(OALfit,kt.method = "iarima")
+plot(fore_oal,only.kt=T)
+```
+
+### Extension du modèle PLAT
+
+\\ln(m\_{xt})=a_x+\\kappa\^1_t+(\\bar{x}-x)\\kappa\^2_t+(\\bar{x}-x)\^+\\kappa_t\^3+(\\[a-x\\]\^{+})\^2\\kappa_t\^4+\\gamma\_{t-x}
+
+```{r}
+f3=function(x,ages) x-mean(ages)
+f4=function(x,ages) pmax(0,mean(ages)-x)
+f5=function(x,ages) (pmax(0,mean(ages)-x))^2
+constPLE=function(ax, bx, kt, b0x, gc, wxt, ages)
+{
+  nYears=dim(wxt)[2]
+  x=ages
+  t=1:nYears
+  xbar=mean(ages,na.rm=T)
+  c=(1-tail(ages,1)):(nYears-ages[1])
+  
+  phireg=lm(gc~1+c+I(c^2),na.action = na.omit)
+  phi=coef(phireg)
+  
+  gc=gc-phi[1]-phi[2]*c+phi[3]*c^2
+  kt[1,]=kt[1,]+phi[2]*t-phi[3]*(t^2-2*xbar*t)
+  kt[2,]=kt[2,]+2*phi[3]*t
+  kt[3,]=kt[3,]
+  ax=ax+phi[1]-phi[2]*x-phi[3]*x^2
+  
+  ci=rowMeans(kt,na.rm = TRUE)
+  
+  kt[1,]=kt[1,]-ci[1]
+  kt[2,]=kt[2,]-ci[2]
+  kt[3,]=kt[3,]-ci[3]
+  kt[4,]=kt[4,]-ci[4]
+  ax=ax+ci[1]+ci[2]*(x-xbar)+ci[3]*(pmax(xbar-x,0))+ci[4]*(pmax(xbar-x,0)^2)
+  
+  list(ax=ax,bx=bx,kt=kt,b0x=b0x,gc=gc)
+}
+PLATE=StMoMo(link="log",staticAgeFun = TRUE,periodAgeFun = c("1",f3,f4,f5),constFun = constPLE,cohortAgeFun = "1")
+
+```
+
+```{r}
+PLATEfit=fit(PLATE,data=FraMaleData,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+```
+
+```{r}
+PLATEfit$deviance
+```
+
+```{r}
+aic=c(AIC(LCfit),AIC(APCfit),AIC(PLATfit),AIC(PLATEfit),AIC(OALfit))
+bic=c(BIC(LCfit),AIC(APCfit),BIC(PLATfit),BIC(PLATEfit),BIC(OALfit))
+mape=c(mape(LCfit),mape(APCfit),mape(PLATfit),mape(PLATEfit),mape(OALfit))
+quality=data.frame(aic=aic,bic=bic,mape=mape,row.names=list('LC','APC','PLAT','PLAT_ext','OAL'))
+```
+
+```{r}
+quality
+```
+
+```{r}
+plot(PLATEfit,nCol = 3,parametricbx = F)
+```
+
+```{r}
+
+```
+
+## Modèle température-Mortalité
+
+```{r}
+temp_=read.csv('C:/Users/GOUTHON Jean-Luc/Données_globale_fr.csv',row.names = 1)
+temp=temp_[1:70,]
+temp
+```
+
+```{r}
+t=1950:2019
+tem=ts(temp[,1],start=1950,frequency = 1)
+plot(t,tem,type="l",ylab='Température moyenne',
+     xlab='Temps',col='red',main='Evolution de la température moyenne en France')
+abline(lm(tem~t),lty=2)
+#legend(x=2020,y=25,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+
+```
+
+```{r}
+### Données de taux de mortalité de 1950 à 2019
+fem_rate=female_rate[1:101,135:200]
+m_rate=male_rate[1:101,135:200]
+t_rate=total_rate[1:101,135:200]                                                                              
+
+```
+
+```{r}
+p=c()
+for (i in 1:101){
+  c=cor.test(temp[,4],m_rate[i,])
+  p=rbind(p,c$p.value)
+  p
+}
+
+```
+
+```{r}
+p
+```
+
+```{r}
+### Corrélation homme_température
+k=dim(m_rate)[1]
+age=ages.fit
+
+
+### Corélation de Pearson
+r=sapply(1:4,function(t){sapply(1:k,function(x){cor(x=temp[,t],y=m_rate[x,],method = 'pearson')})})
+corpe_male_temp=data.frame(r,row.names = age)
+colnames(corpe_male_temp)=list('Corr_t_mean','Corr_t_min','Corr_t_max','Corr_t_nbr_month')
+
+
+
+### Corélation de Spearman
+r=sapply(1:4,function(t){sapply(1:k,function(x){cor(x=temp[,t],y=m_rate[x,],method='spearman')})})
+corsp_male_temp=data.frame(r,row.names = age)
+colnames(corsp_male_temp)=list('Corr_t_mean','Corr_t_min','Corr_t_max','Corr_t_nbr_month')
+```
+
+```{r}
+### Graphique 
+#par(mfrow=c(2,2))
+plot(x=age,y=corpe_female_temp[,1],xlab='Age',ylab="Corrélation",type='l',col='red',ylim=c(-0.8,0.2),main="Graphiques corrélation pour les femmes")
+  #lines(corsp_male_temp[,i],col='blue')
+lines(corpe_female_temp[,2],col="3")
+lines(corpe_female_temp[,3],col="9")
+legend(x=65,y=0.1,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+### ### Corrélation femme_température
+k=dim(m_rate)[1]
+age=ages.fit
+
+### Corélation de Pearson
+f=sapply(1:4,function(t){sapply(1:k,function(x){cor(x=temp[,t],y=fem_rate[x,],method = 'pearson')})}) 
+corpe_female_temp=data.frame(f,row.names = age)
+colnames(corpe_female_temp)=list('Corr_t_mean','Corr_t_min','Corr_t_max','Corr_t_nbr_month')
+
+### Corélation de Spearman
+r=sapply(1:4,function(t){sapply(1:k,function(x){cor(x=temp[,t],y=fem_rate[x,],method='spearman')})})
+corsp_female_temp=data.frame(f,row.names = age)
+colnames(corsp_female_temp)=list('Corr_t_mean','Corr_t_min','Corr_t_max','Corr_t_nbr_month')
+
+```
+
+```{r}
+par(mfrow=c(2,2))
+for (i in 1:4)
+{
+  plot(x=age,y=corpe_female_temp[,i],xlab='Age',ylab=colnames(corpe_female_temp)[i],type='l',col='red')
+  lines(corsp_female_temp[,i],col='blue')
+}
+```
+
+### Modèle SPO
+
+#### a) Modèle SPO_homme
+
+```{r}
+f2=function(x,ages) mean(ages)-x
+f3=function(x,ages) pmax(0,mean(ages)-x)#+(pmax(0,a-x))^2
+f4=function(x,ages) (pmax(0,a-x)+cx[a+1]*pmax(0,x-a))^2
+#f5=function(x,ages) cx[a+1]*pmax(0,x-a)^2
+
+constSPO=function(ax, bx, kt, b0x, gc, wxt, ages)
+{
+  nYears=dim(wxt)[2]
+  x=ages
+  t=1:nYears
+  xbar=mean(ages,na.rm=T) 
+  c=(1-tail(ages,1)):(nYears-ages[1])
+  
+  phireg=lm(gc~1+c+I(c^2),na.action = na.omit)
+  phi=coef(phireg)
+  
+  gc=gc-phi[1]-phi[2]*c-phi[3]*c^2
+  kt[1,]=kt[1,]+phi[2]*t+phi[3]*(t^2-2*xbar*t)
+  kt[2,]=kt[2,]+2*phi[3]*t
+  ax=ax+phi[1]-phi[2]*x+phi[3]*x^2
+  
+  ci=rowMeans(kt,na.rm = TRUE)
+  
+  kt[1,]=kt[1,]-ci[1]
+  kt[2,]=kt[2,]-ci[2]
+  kt[3,]=kt[3,]-ci[3]
+  kt[4,]=kt[4,]-ci[4]
+  #kt[5,]=kt[5,]-ci[5]
+  ax=ax+ci[1]+ci[2]*(xbar-x)+ci[3]*pmax(xbar-x,0)+ci[4]*(pmax(0,a-x)+cx[a+1]*(pmax(0,x-a)))^2     
+  
+  list(ax=ax,bx=bx,kt=kt,b0x=b0x,gc=gc)
+}
+SPO=StMoMo(link="log",staticAgeFun = TRUE,periodAgeFun = c("1",f2,f3,f4),constFun = constSPO,cohortAgeFun = "1")
+```
+
+```{r}
+### Modèle SPO pour la température moyenne
+defaultw=getOption("warn")
+options(warn=-1)
+aic_mean=c()
+bic_mean=c()
+corr_mean=c()
+
+for(i in 40:60)
+{
+  a=i
+  cx=corpe_male_temp[,1]
+  SPOfit=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+  aic_mean=rbind(aic_mean,AIC(SPOfit))
+  bic_mean=rbind(bic_mean,BIC(SPOfit))
+  corr_mean=rbind(corr_mean,cx[i+1])
+}
+```
+
+```{r}
+spo_t_mean_m=data.frame(age=40:60,aic=aic_mean,bic=bic_mean,corrélation=corr_mean)
+spo_t_mean_m
+```
+
+```{r}
+cx_spo_mean=corpe_male_temp[46+1,1]
+cx_spo_mean
+```
+
+Donc le modèle adapté dans le cas de la température moyenne est celui avec l'âge seuil $a=46ans$
+avec un coefficient de corrélation de pearson égal à -0.7267752.
+
+```{r}
+### Modèle SPO avec la température moyenne annuelle
+a=46
+cx=corpe_male_temp[,1]
+ages.fit=0:100
+years.fit=1950:2015
+wxt=genWeightMat(ages=ages.fit,years=years.fit)
+SPOMale_mean=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+```{r}
+resSPO=residuals(SPOMale_mean)
+plot(resSPO,type="scatter",col='red',reslim=c(-4,4))
+```
+
+```{r}
+plot(SPOMale_mean$ax,type="l",col='red',ylab = "ax",xlab='Ages',lwd=1.5,main="Graphiques ax pour les hommes")
+lines(SPOMale_min$ax,col="3",lwd=1.5)
+lines(SPOMale_max$ax,col="9",lwd=1.5)
+legend(x=1850,y=-5,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+plot(ts(SPOMale_mean$gc,start=1850,frequency = 1),type="l",col='red',ylab = "gc",xlab='Année de naissance',lwd=1.5,main="Graphiques gamma pour les hommes")
+lines(ts(SPOMale_min$gc,start=1850,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOMale_max$gc,start=1850,frequency = 1),col="9",lwd=1.5)
+legend(x=1850,y=-5,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+### kt1
+plot(ts(SPOMale_mean$kt[1,],start=1950,frequency = 1),type="l",col='red',ylab = "kt1",xlab='Année',lwd=1.5,main="Graphique de l'indice kt1 pour les hommes")
+lines(ts(SPOMale_min$kt[1,],start=1950,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOMale_max$kt[1,],start=1950,frequency = 1),col="9",lwd=1.5)
+legend(x=1950,y=-2,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+plot(ts(SPOMale_mean$kt[2,],start=1950,frequency = 1),type="l",col='red',ylab = "kt2",xlab='Année',lwd=1.5,main="Graphique de l'indice kt2 pour les hommes")
+lines(ts(SPOMale_min$kt[2,],start=1950,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOMale_max$kt[2,],start=1950,frequency = 1),col="9",lwd=1.5)
+legend(x=2002,y=0.1,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+plot(ts(SPOMale_mean$kt[3,],start=1950,frequency = 1),type="l",col='red',ylim=c(-0.05,0.06),ylab = "kt3",xlab='Année',lwd=1.5,main="Graphique de l'indice kt3 pour les hommes")
+lines(ts(SPOMale_min$kt[3,],start=1950,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOMale_max$kt[3,],start=1950,frequency = 1),col="9",lwd=1.5)
+legend(x=1990,y=0.05,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+plot(ts(SPOMale_mean$kt[4,],start=1950,frequency = 1),type="l",col='red',ylim=c(-0.005,0.01),ylab = "kt4",xlab='Année',lwd=1.5,main="Graphique de l'indice kt4 pour les hommes")
+lines(ts(SPOMale_min$kt[4,],start=1950,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOMale_max$kt[4,],start=1950,frequency = 1),col="9",lwd=1.5)
+legend(x=1950,y=0.01,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+### Représentation des données réelles SPO_estimés de 2003 
+SPO_mean_dxt=fitted(SPOMale_mean,type = "deaths")
+Dxt=LCfit$Dxt
+plot(SPO_mean_dxt[,54],type='l',x=ages.fit)
+lines(Dxt[,54],x=ages.fit)
+```
+
+```{r}
+mean(abs(SPO_mean_dxt[0:101,54]-Dxt[0:101,54]))
+```
+
+```{r}
+### Les critères du modèle
+print(c(AIC(SPOMale_mean),BIC(SPOMale_mean),SPOMale_mean$deviance,mape(SPOMale_mean)))
+```
+
+```{r}
+plot(SPOMale_mean,parametricbx = F,nCol=3)
+```
+
+```{r}
+re=residuals(SPOMale_mean)
+plot(re,type='colourmap')
+```
+
+```{r}
+### Modèle SPO avec température minimale
+defaultw=getOption("warn")
+options(warn=-1)
+aic_min=c()
+bic_min=c()
+corr_min=c()
+
+for(i in 40:60)
+{
+  a=i
+  cx=corpe_male_temp[,2]
+  SPOfit=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+  aic_min=rbind(aic_min,AIC(SPOfit))
+  bic_min=rbind(bic_min,BIC(SPOfit))
+  corr_min=rbind(corr_min,cx[i+1])
+}
+```
+
+```{r}
+spo_t_min_m=data.frame(age=40:60,aic=aic_min,bic=bic_min,corrélation=corr_min)
+spo_t_min_m
+```
+
+Donc le modèle adapté dans le cas de la température minimale est celui avec l'âge seuil $a=51ans$
+avec un coefficient de corrélation de pearson égal à -0.3319556.
+
+```{r}
+a=51
+cx=corpe_male_temp[,2]
+SPOMale_min=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+```{r}
+print(c(AIC(SPOMale_min),BIC(SPOMale_min),SPOMale_min$deviance,mape(SPOMale_min)))
+```
+
+```{r}
+plot(SPOMale_min$ax,type="l",col='red',ylab = "ax",xlab='Ages')
+```
+
+```{r}
+### Modèle SPO avec température maximale
+defaultw=getOption("warn")
+options(warn=-1)
+aic_max=c()
+bic_max=c()
+corr_max=c()
+
+for(i in 40:60)
+{
+  a=i
+  cx=corpe_male_temp[,3]
+  SPOfit=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+  aic_max=rbind(aic_max,AIC(SPOfit))
+  bic_max=rbind(bic_max,BIC(SPOfit))
+  corr_max=rbind(corr_max,cx[i+1])
+}
+```
+
+```{r}
+spo_t_max_m=data.frame(age=40:60,aic=aic_max,bic=bic_max,corrélation=corr_max)
+spo_t_max_m
+```
+
+Donc le modèle adapté dans le cas de la température maximale est celui avec l'âge seuil $a=48ans$
+avec un coefficient de corrélation de pearson égal à
+
+|            |
+|-----------:|
+| -0.4462892 |
+
+```{r}
+a=48
+cx=corpe_male_temp[,3]
+SPOMale_max=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+```{r}
+print(c(AIC(SPOMale_max),BIC(SPOMale_max),SPOMale_max$deviance,mape(SPOMale_max)))
+```
+
+```{r}
+plot(SPOMale_max$ax,parametricbx=F,nCol=3,col=4)
+```
+
+|     |
+|----:|
+|     |
+
+```{r}
+### Modèle SPO avec le nombre mois avec une température sup à 20°C ou inf 0°C 
+defaultw=getOption("warn")
+options(warn=-1)
+aic_nb=c()
+bic_nb=c()
+corr_nb=c()
+
+for(i in 40:60)
+{
+  a=i
+  cx=corpe_male_temp[,3]
+  SPOfit=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+  aic_nb=rbind(aic_nb,AIC(SPOfit))
+  bic_nb=rbind(bic_nb,BIC(SPOfit))
+  corr_nb=rbind(corr_nb,cx[i+1])
+}
+```
+
+```{r}
+spo_t_nb_m=data.frame(age=40:60,aic=aic_nb,bic=bic_nb,corrélation=corr_nb)
+spo_t_nb_m
+```
+
+a=48ans et cx=-0.4524905 correspondant
+
+```{r}
+a=48
+cx=corpe_male_temp[,4]
+SPOMale_nbr=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+```{r}
+print(c(AIC(SPOMale_nbr),BIC(SPOMale_nbr),SPOMale_nbr$deviance,mape(SPOMale_nbr)))
+```
+
+#### b) pour les femmes
+
+```{r}
+### Modèle SPO pour la température moyenne
+defaultw=getOption("warn")
+options(warn=-1)
+aic_mean=c()
+bic_mean=c()
+corr_mean=c()
+
+for(i in 40:60)
+{
+  a=i
+  cx=corpe_female_temp[,1]
+  SPOfit=fit(SPO,FraFemaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+  aic_mean=rbind(aic_mean,AIC(SPOfit))
+  bic_mean=rbind(bic_mean,BIC(SPOfit))
+  corr_mean=rbind(corr_mean,cx[i+1])
+}
+```
+
+```{r}
+spo_t_mean_f=data.frame(age=40:60,aic=aic_mean,bic=bic_mean,corrélation=corr_mean)
+spo_t_mean_f
+```
+
+$41ans$ avec une corrélation -0.5324377
+
+```{r}
+a=41
+cx=corpe_female_temp[,1]
+SPOFem_mean=fit(SPO,FraFemaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+```{r}
+print(c(AIC(SPOFem_mean),BIC(SPOFem_mean),SPOFem_mean$deviance,mape(SPOFem_mean)))
+```
+
+```{r}
+plot(SPOFem_mean$ax,type="l",col='red',ylab = "ax",xlab='Année de naissance',lwd=1.5,main="Graphiques ax pour les femmes")
+lines(SPOFem_min$ax,col="3",lwd=1.5)
+lines(SPOFem_max$ax,col="9",lwd=1.5)
+legend(x=0,y=0,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+plot(ts(SPOFem_mean$gc,start=1850,frequency = 1),type="l",col='red',ylab = "gc",xlab='Année de naissance',lwd=1.5,main="Graphiques gamma pour les femmes")
+lines(ts(SPOFem_min$gc,start=1850,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOFem_max$gc,start=1850,frequency = 1),col="9",lwd=1.5)
+legend(x=1850,y=-5,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+plot(ts(SPOFem_mean$kt[1,],start=1950,frequency = 1),type="l",col='red',ylab = "kt1",xlab='Année',lwd=1.5,main="Graphique de l'indice kt1 pour les femmes")
+lines(ts(SPOFem_min$kt[1,],start=1950,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOFem_max$kt[1,],start=1950,frequency = 1),col="9",lwd=1.5)
+legend(x=1950,y=-2,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+plot(ts(SPOFem_mean$kt[2,],start=1950,frequency = 1),type="l",col='red',ylim=c(-0.05,0.1),ylab = "kt2",xlab='Année',lwd=1.5,main="Graphique de l'indice kt2 pour les femmes")
+lines(ts(SPOFem_min$kt[2,],start=1950,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOFem_max$kt[2,],start=1950,frequency = 1),col="9",lwd=1.5)
+legend(x=1950,y=0.01,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+plot(ts(SPOFem_mean$kt[3,],start=1950,frequency = 1),type="l",col='red',ylim=c(-0.05,0.07),ylab = "kt3",xlab='Année',lwd=1.5,main="Graphique de l'indice kt3 pour les femmes")
+lines(ts(SPOFem_min$kt[3,],start=1950,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOFem_max$kt[3,],start=1950,frequency = 1),col="9",lwd=1.5)
+legend(x=1995,y=0.07,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+plot(ts(SPOFem_mean$kt[4,],start=1950,frequency = 1),type="l",col='red',ylim=c(-0.005,0.01),ylab = "kt4",xlab='Année',lwd=1.5,main="Graphique de l'indice kt4 pour les femmes")
+lines(ts(SPOFem_min$kt[4,],start=1950,frequency = 1),col="3",lwd=1.5)
+lines(ts(SPOFem_max$kt[4,],start=1950,frequency = 1),col="9",lwd=1.5)
+legend(x=1950,y=0.01,legend = c('T° moyenne',"T° minimale","T° maximale"),col=c('red',3,9),lwd=1.5,cex=0.7)
+```
+
+```{r}
+### Modèle SPO avec température minimale
+defaultw=getOption("warn")
+options(warn=-1)
+aic_min=c()
+bic_min=c()
+corr_min=c()
+
+for(i in 40:60)
+{
+  a=i
+  cx=corpe_female_temp[,2]
+  SPOfit=fit(SPO,FraFemaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+  aic_min=rbind(aic_min,AIC(SPOfit))
+  bic_min=rbind(bic_min,BIC(SPOfit))
+  corr_min=rbind(corr_min,cx[i+1])
+}
+
+```
+
+```{r}
+spo_t_min_f=data.frame(age=40:60,aic=aic_min,bic=bic_min,corrélation=corr_min)
+spo_t_min_f
+```
+
+a=40ans cx=-0.2853606
+
+```{r}
+a=40
+cx=corpe_female_temp[,2]
+SPOFem_min=fit(SPO,FraFemaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+```{r}
+print(c(AIC(SPOFem_min),BIC(SPOFem_min),SPOFem_min$deviance,mape(SPOFem_min)))
+```
+
+```{r}
+### Modèle SPO avec température maximale
+defaultw=getOption("warn")
+options(warn=-1)
+aic_max=c()
+bic_max=c()
+corr_max=c()
+
+for(i in 40:60)
+{
+  a=i
+  cx=corpe_female_temp[,3]
+  SPOfit=fit(SPO,FraFemaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+  aic_max=rbind(aic_max,AIC(SPOfit))
+  bic_max=rbind(bic_max,BIC(SPOfit))
+  corr_max=rbind(corr_max,cx[i+1])
+}
+```
+
+```{r}
+spo_t_max_f=data.frame(age=40:60,aic=aic_max,bic=bic_max,corrélation=corr_max)
+spo_t_max_f
+```
+
+a=40ans cx=-0.38
+
+```{r}
+a=40
+cx=corpe_female_temp[,3]
+SPOFem_max=fit(SPO,FraFemaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+```{r}
+resSPOf=residuals(SPOFem_max)
+plot(resSPOf,type="scatter",col='blue',reslim=c(-4,4))
+```
+
+```{r}
+print(c(AIC(SPOFem_max),BIC(SPOFem_max),SPOFem_max$deviance,mape(SPOFem_max)))
+```
+
+```{r}
+### Modèle SPO avec le nombre mois avec une température sup à 20°C ou inf 0°C 
+defaultw=getOption("warn")
+options(warn=-1)
+aic_nb=c()
+bic_nb=c()
+corr_nb=c()
+
+for(i in 40:60)
+{
+  a=i
+  cx=corpe_female_temp[,4]
+  SPOfit=fit(SPO,FraFemaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+  aic_nb=rbind(aic_nb,AIC(SPOfit))
+  bic_nb=rbind(bic_nb,BIC(SPOfit))
+  corr_nb=rbind(corr_nb,cx[i+1])
+}
+```
+
+```{r}
+spo_t_nb_f=data.frame(age=40:60,aic=aic_nb,bic=bic_nb,corrélation=corr_nb)
+spo_t_nb_f
+```
+
+a=40ans
+
+```{r}
+a=40
+cx=corpe_female_temp[,4]
+SPOFem_nb=fit(SPO,FraFemaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+```{r}
+### Critère de sélection
+print(c(AIC(SPOFem_nb),BIC(SPOFem_nb),SPOFem_nb$deviance,mape(SPOFem_nb)))
+```
+
+```{r}
+
+```
+
+### Forecasting
+
+##### SPO
+
+```{r}
+### Homme
+fore_spomean=forecast(SPOMale_mean,h=50,kt.method="iarima")
+plot(fore_spomean,only.kt=T)
+```
+
+```{r}
+### Femme 
+fore_spomaxf=forecast(SPOFem_min,h=50,kt.method="iarima")
+plot(fore_spomaxf,only.kt=T)
+```
+
+```{r}
+fore_spomaxf$gc.f$model
+```
+
+```{r}
+###Erreur de prévision
+male_rate=data$rate$male
+female_rate=data$rate$female
+mx_test=female_rate[1:101,201:204]
+mape_spomaxf=mean(abs(fore_spomaxf$rates[1:101,1:4]-mx_test)/mx_test)
+mape_spomaxf
+```
+
+```{r}
+dim(mx_test)
+```
+
+### Prévision des séries temporelles
+
+##### Modèle LC
+
+```{r}
+fore_lc=forecast(LCfit,h=50,kt.method = "iarima")
+plot(fore_lc,only.kt=T)
+```
+
+```{r}
+fore_lc$kt.f$model
+```
+
+```{r}
+fore_lcf=forecast(LCfitf,h=50,kt.method = "iarima")
+plot(fore_lc,only.kt=T)
+```
+
+```{r}
+fore_lcf$kt.f$model
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+##### Modèle PLAT
+
+```{r}
+fore_plat=forecast(PLATfit,h=50,kt.method = "iarima")
+plot(fore_plat,only.kt=T)
+```
+
+```{r}
+fore_plat$gc.f$model
+```
+
+```{r}
+fore_platf=forecast(PLATfitf,h=50,kt.method = "iarima")
+plot(fore_platf,only.gc=T)
+```
+
+```{r}
+fore_platf$gc.f$model
+```
+
+```{r}
+### kt3
+Pkt3=ts(PLATfit$kt[3,],start = 1950,frequency = 1)
+par(mfrow=c(2,2))
+ts.plot(Pkt3)
+hist(Pkt3 ,breaks="Sturges", freq=F)
+lines(density(Pkt3),lwd=2)
+acf(Pkt3,lag=36, lwd=2)
+pacf(Pkt3,lag=36, lwd=2)
+```
+
+```{r}
+fit_p3=auto.arima(Pkt3)
+fore_p3=forecast(fit_p3,h=80)
+plot(fore_p3)
+```
+
+```{r}
+### gamma
+p_gc=ts(PLATfit$gc,start = 1850,frequency = 1)
+par(mfrow=c(2,2))
+ts.plot(p_gc)
+hist(p_gc ,breaks="Sturges", freq=F)
+lines(density(p_gc),lwd=2)
+acf(p_gc,lag=36, lwd=2)
+pacf(p_gc,lag=36, lwd=2)
+```
+
+```{r}
+fit_p_gc=auto.arima(p_gc)
+fore_p_gc=forecast(fit_p_gc,h=80)
+plot(fore_p_gc)
+```
+
+```{r}
+
+```
+
+```{r}
+cor(temp_r1,df_rate)
+```
+
+```{r}
+temp
+```

@@ -1,0 +1,849 @@
+---
+title: "Implémentation du modèle"
+author: "Jean-Luc"
+date: "2023-06-05"
+output: html_document
+---
+
+```{r}
+library(StMoMo)
+library(demography)
+library(urca)
+library(tseries)
+```
+
+### Importation des données
+
+#### 1) Données de mortalité
+
+```{r}
+data <- read.demogdata("Mx_1x1.txt","Exposures_1x1.txt", type="mortality", label="France")
+FraMaleData=StMoMoData(data, series = names(data$rate)[2], type ="central")
+FraFemaleData=StMoMoData(data, series = names(data$rate)[1], type ="central")
+```
+
+```{r}
+data <- read.demogdata("Mx_1x1.txt",
+                       "Exposures_1x1.txt", 
+                       type="mortality", label="France")
+FraMaleData=StMoMoData(data, series = names(data$rate)[2], type ="central")
+
+```
+
+#### 2) Données d'indicateur de température
+
+
+
+
+
+```{r}
+### APC étant emboîté dans le modèle proposé, avec la formule du rapport de vraisemblance on peut retirer le logkihood du modèle proposé
+
+loglik=function(model,data,ages.fit,years.fit,wxt)
+{
+  APC=apc(link="log")
+  APCfit=fit(APC,data=data,ages.fit = ages.fit, years.fit = years.fit, wxt = wxt)
+  dev_apc=APCfit$deviance
+  loglik_apc=APCfit$loglik
+  dev_mod=model$model$deviance
+  
+  #### dev_mod-dev_apc=2(loglik_apc-loglik_mod)
+  loglik_mod=loglik_apc-(dev_mod-dev_apc)/2
+  loglik_mod
+}
+
+aic_mod=function(model,data,ages.fit,years.fit,wxt)
+{
+  loglik_mod=loglik(model,data,ages.fit,years.fit,wxt)
+  aic=2*model$npar-2*loglik_mod
+  aic
+}
+bic_model=function(model,data,ages.fit,years.fit,wxt)
+{
+  loglik_mod=loglik(model,data,ages.fit,years.fit,wxt)
+  bic=log(model$nobs)*(model$npar)-2*(loglik_mod)
+  bic
+}
+```
+
+```{r}
+### Fonction calculant la matrice de cohorte
+### df étant  une matrice de zéros de taille n*n.c
+
+indic=function(df,n_a,n_y)
+{
+  a=c(rep(1:n_a,n_y))
+  y=c(rep(1:n_y,each=n_a))
+  c=cbind(a,y) ### c représente les indexes de la matrice obtenue après flatten de D_xt.
+  
+  x=sort(unique(y-a))
+  m=dim(df)
+  for (i in 1:m[1])
+    for(j in 1:m[2])
+      if((c[i,2]-c[i,1])==x[j])
+        df[i,j]=1
+  df
+}
+
+```
+
+```{r}
+model_function=function(dxt,ext,wxt,a_c,ages)
+{
+  n.a=dim(dxt)[1]
+  n.t=dim(dxt)[2]
+  n=n.a*n.t
+  n.c=n.a+n.t-1
+  
+  x=ages
+  x.bar=mean(x)
+  e.log=log(ext)
+  
+  
+  
+  ###Constructiion de la matrice de kt_5
+  m=diag(I_t)
+  t=dim(m)[2]
+  v=c()
+  u=sapply(1:t,function(x){sum(m[,x])})
+  for(i in 1:length(u))
+  {
+    if (u[i]!=0)
+    {
+      v=cbind(v,m[,i])
+    }
+  }
+  I_t=v
+  
+  n.t5=dim(I_t)[2]
+  
+  
+  
+  ### Vectorisation de d_xt et e_xt
+  v_dxt=as.vector(dxt)
+  v_ext=as.vector(e.log)
+  v_wxt=as.vector(wxt)
+  
+  ### Matrice X du modèle 
+   
+  #### 1) Matrice d'âge
+  X_a=kronecker(as.matrix(rep(1,n.t)),diag(n.a))
+
+  #### 2) Matrice de période kt1
+  X_t1=kronecker(diag(n.t),as.matrix(rep(1,n.a)))
+  
+  #### 3) Matrice de période kt2
+  X_t2=kronecker(diag(n.t),as.matrix(x.bar-x))
+  
+  #### 4) Matrice de période kt3
+  X_t3=kronecker(diag(n.t),as.matrix(pmax(x.bar-x,0)))
+
+  #### 4) Matrice de période kt4
+  X_t4=kronecker(diag(n.t),as.matrix((-0.499*pmax(49-x,0))^2+(0.737*(pmax(48-x)))^2))
+  
+  #### 5) Matrice de période kt5
+  #X_t5=kronecker(I_t,as.matrix(c_x*pmax(x-a_c,0)^2))
+  
+  ### Matrice de cohorte
+  X_c=indic(matrix(0,n,n.c),n.a,n.t)
+  
+  
+  
+  #### Enfin on obtient
+  X=cbind(X_a,X_t1,X_t2,X_t3,X_t4,X_c)
+  
+  
+  
+  #### Matrice de contraintes
+  
+  ### Contrainte 1
+  #h1=cbind(t(rep(0,n.a)),t(rep(1,n.t)),t(rep(0,3*n.t+n.t5+n.c)))
+  h1=cbind(t(rep(0,n.a)),t(rep(1,n.t)),t(rep(0,3*n.t+n.c)))
+  
+  ### Contrainte 2
+  #h2=cbind(t(rep(0,n.a+n.t)),t(rep(1,n.t)),t(rep(0,2*n.t+n.t5+n.c)))
+  h2=cbind(t(rep(0,n.a+n.t)),t(rep(1,n.t)),t(rep(0,2*n.t+n.c)))
+ 
+  ### Contrainte 3
+  #h3=cbind(t(rep(0,n.a+2*n.t)),t(rep(1,n.t)),t(rep(0,n.t+n.t5+n.c)))
+  h3=cbind(t(rep(0,n.a+2*n.t)),t(rep(1,n.t)),t(rep(0,n.t+n.c)))
+  
+  ### Contrainte 4
+  #h4=cbind(t(rep(0,n.a+3*n.t)),t(rep(1,n.t)),t(rep(0,n.t5+n.c)))
+  h4=cbind(t(rep(0,n.a+3*n.t)),t(rep(1,n.t)),t(rep(0,n.c)))
+  
+  ### Contrainte 5
+  #h5=cbind(t(rep(0,n.a+4*n.t+n.t5)),t(rep(1,n.c)))
+  h5=cbind(t(rep(0,n.a+4*n.t)),t(rep(1,n.c)))
+  
+  ### Contrainte 6
+  #h6=cbind(t(rep(0,n.a+4*n.t+n.t5)),t(1:n.c))
+  h6=cbind(t(rep(0,n.a+4*n.t)),t(rep(1,n.c)))
+  
+  ### Contrainte 7
+  #h7=cbind(t(rep(0,n.a+4*n.t+n.t5)),t((1:n.c)^2))
+  h7=cbind(t(rep(0,n.a+4*n.t)),t((1:n.c)^2))
+  
+  H=rbind(h1,h2,h3,h4,h5,h6,h7)
+  
+  
+  #### Modèle 
+  model=gnm(v_dxt~-1+offset(v_ext)+X,weights = v_wxt,family = poisson(link = 'log'))
+  
+  
+  
+  #### Matrice des coefficients
+  teta=solve(t(X)%*%X+t(H)%*%H,tol=4.36182e-19)%*%t(X)%*%(log(model$fitted.values)-v_ext)
+  
+  ax=teta[1:n.a]
+  kt1=teta[(n.a+1):(n.a+n.t)]
+  kt2=teta[(n.a+n.t+1):(n.a+2*n.t)]
+  kt3=teta[(n.a+2*n.t+1):(n.a+3*n.t)]
+  kt4=teta[(n.a+3*n.t+1):(n.a+4*n.t)]
+  #kt5=teta[(n.a+4*n.t+1):(n.a+4*n.t+n.t5)]
+  gc=teta[(n.a+4*n.t+1):dim(teta)[1]]
+  
+  structure(list(
+    ax=ax,
+    kt1=ts(kt1,start=1950,frequency=1),
+    kt2=ts(kt2,start=1950,frequency=1),
+    kt3=ts(kt3,start=1950,frequency=1),
+    kt4=ts(kt4,start=1950,frequency=1),
+    #kt5=kt5,
+    gc=gc,
+    Dxt=dxt,
+    Ext=ext,
+    wxt=wxt,
+    npar=dim(teta)[1],
+    nobs=n.a*n.t,
+    model=model
+  ))
+  
+}
+
+```
+
+```{r}
+### Fonction de calcul du MAPE
+mape=function(model)
+{
+  model_dxt=fitted(model,type = "deaths")
+  ext=model$Ext
+  dxt=model$Dxt
+  mx_fit=model_dxt/ext
+  mx=dxt/ext
+  mape=mean(abs((mx_fit-mx)/mx))
+  mape
+}
+
+```
+
+```{r}
+ages.fit=0:100
+years.fit=1950:2017
+
+fr_m=FraMaleData$Dxt[1:101,(years.fit[1]-1816+1):(tail(years.fit,1)-1816+1)]
+
+fr_e=FraMaleData$Ext[1:101,(years.fit[1]-1816+1):(tail(years.fit,1)-1816+1)]
+wei=genWeightMat(ages=ages.fit,years=years.fit)
+#ind_=ind[21:56,1]
+ind_=0
+#ind_=as.integer(ind_[,1])
+model=model_function(fr_m,fr_e,wei,65,ages.fit)
+```
+
+```{r}
+### Fonction des valeurs estimées
+fit_model=function(model,ages.fit,years.fit)
+{
+  n.a=length(ages.fit)
+  n.t=length(years.fit)
+  dxt_fit=matrix(model$model$fitted.values,nrow=n.a,ncol=n.t,dimnames = list(ages.fit,years.fit))
+  uxt_fit=dxt_fit/model$Ext
+  
+  structure(
+    list(
+      Dxt_fit=dxt_fit,
+      uxt_fit=uxt_fit
+    )
+  )
+}
+```
+
+```{r}
+ages.fit=0:100
+years.fit=1950:2017
+wei=genWeightMat(ages=ages.fit,years=years.fit)
+loglik_model=loglik(model,FraMaleData,ages.fit,years.fit,wei)
+aic_m=aic_mod(model,FraMaleData,ages.fit,years.fit,wei)
+bic_m=bic_model(model,FraMaleData,ages.fit,years.fit,wei)
+```
+
+```{r}
+### Déviance du modèle
+print(c(loglik_model,model$model$deviance,aic_m,bic_m))
+```
+
+```{r}
+### Erreur MAPE
+years.fit=1950:2017
+ages.fit=0:100
+fit_=fit_model(model,ages.fit,years.fit)
+model_uxt=fit_$uxt_fit
+mx=model$Dxt/model$Ext
+model_mape=mean(abs((mx-model_uxt)/mx))
+model_mape
+```
+
+
+
+
+
+```{r}
+### Application du modèle sur les données de la mortalité féminine
+ages.fit=0:100
+years.fit=1950:2015
+frf_m=FraFemaleData$Dxt[0:101,135:200]
+frf_e=FraFemaleData$Ext[0:101,135:200]
+wei=genWeightMat(ages=ages.fit,years=years.fit)
+ind_=ind[1:66,]
+#ind_=as.integer(ind_[,1])
+model_fem=model_function(frf_m,frf_e,wei,ind_,0.43,65,ages.fit)
+```
+
+```{r}
+ages.fit=0:100
+years.fit=1950:2015
+wei=genWeightMat(ages=ages.fit,years=years.fit)
+loglik_model_f=loglik(model_fem,FraFemaleData,ages.fit,years.fit,wei)
+aic_f=aic_mod(model_fem,FraFemaleData,ages.fit,years.fit,wei)
+bic_f=bic_model(model_fem,FraFemaleData,ages.fit,years.fit,wei)
+```
+
+```{r}
+### Déviance du modèle
+print(c(loglik_model_f,model_fem$model$deviance,aic_f,bic_f))
+```
+
+```{r}
+### Erreur MAPE femme
+fitf_=fit_model(model_fem,ages.fit,years.fit)
+model_fem_uxt=fitf_$uxt_fit
+mx_f=model_fem$Dxt/model_fem$Ext
+model_fem_mape=mean(abs((mx_f-model_fem_uxt)/mx_f))
+model_fem_mape
+```
+
+
+
+```{r}
+a=40
+cx=corpe_female_temp[,3]
+SPOFem_max=fit(SPO,FraFemaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
+```
+
+```{r}
+### Représentation des données réelles LC_estimés de 2023 
+model_fem_dxt=fit_model(model_fem,ages.fit,years.fit)$Dxt_fit
+fem_Dxt=model_fem$Dxt
+fem_Ext=model_fem$Ext
+SPO_mean_dxt=fitted(SPOFem_max,type="deaths")
+plot(model_fem_dxt[70:101,54]/fem_Ext[70:101,54],type='l',x=70:101)
+##lines(fem_Dxt[70:101,54]/fem_Ext[70:101,54],x=70:101,col='red')
+lines(SPO_mean_dxt[70:101,54]/fem_Ext[70:101,54],x=70:101,col="blue")
+```
+
+```{r}
+model_fem$model$deviance
+```
+
+#### Prévisions des séries temporelles des données sur les hommes
+
+```{r}
+n.a=length(ages.fit)
+n.t=length(years.fit)
+cohort=(years.fit[1]-ages.fit[n.a]):(years.fit[n.t]-ages.fit[1])
+
+### kt1
+kt1=ts(model$kt1,start=years.fit[1],frequency = 1)
+fit1=auto.arima(kt1)
+fore_1=forecast(fit1, h=50)
+kt1_pred=fore_1$mean
+plot(fore_1)
+```
+
+```{r}
+### kt2
+kt2=ts(model$kt2,start=years.fit[1],frequency = 1)
+fit2=auto.arima(kt2)
+fore_2=forecast(fit2,h=50)
+kt2_pred=fore_2$mean
+plot(fore_2)
+```
+
+```{r}
+### kt3
+kt3=ts(model$kt3,start=years.fit[1],frequency = 1)
+fit3=auto.arima(kt3)
+fore_3=forecast(fit3,h=50)
+kt3_pred=fore_3$mean
+plot(fore_3)
+```
+
+```{r}
+### kt4
+kt4=ts(model$kt4,start=years.fit[1],frequency = 1)
+fit4=auto.arima(kt4)
+fore_4=forecast(fit4,h=50)
+plot(fore_4)
+```
+
+```{r}
+kt4_pred=fore_4$mean
+```
+
+```{r}
+model$kt5
+```
+
+```{r}
+kt5=plot(x=c(1975,1983,1990,2003,2006,2015),model$kt5,col='red',xlab="année_caniculaire",ylab="kt5",main="Graphique kt5 pour les femmes")
+```
+
+```{r}
+kt5=ts(model$kt5,start=1,frequency = 1)
+#plot(kt5)
+fit5=auto.arima(kt5)
+fore_5=forecast(fit5,h=20)
+kt5_pred=fore_5$mean
+plot(fore_5)
+```
+
+```{r}
+fore_5$mean
+```
+
+```{r}
+x = seq(from = 1 , to = length(kt5) , by = 1)
+y = kt5
+par(mfrow = c(1 , 1))
+plot(x , y , type = "l")
+points(x , y , col = "red")
+l = Reg(x , y)
+points(l$x , l$y , col = "blue")
+```
+
+```{r}
+kt5_est=ts(l$y,start=1,frequency = 1)
+fit5=auto.arima(kt5_est)
+fore_5=forecast(fit5,h=20)
+kt5_pred=fore_5$mean
+plot(fore_5)
+```
+
+```{r}
+### gc
+g=ts(model$gc,start=cohort[1],frequency=1)
+plot(g)
+fit_gc=auto.arima(g)
+pc=forecast(fit_gc,h=50)
+gc_pred=pc$mean
+plot(pc)
+```
+
+```{r}
+gg=cbind(g,gc_pred)
+gg
+```
+
+```{r}
+### Prévision température
+ind_pred=read.csv('C:/Users/GOUTHON Jean-Luc/indic.csv',row.names = 1)
+ind_pred
+```
+
+```{r}
+
+n.a=length(ages.fit)# age length
+n.t=length(years.fit) # time length
+cohort=(years.fit[1]-ages.fit[n.a]):(years.fit[n.t]-ages.fit[1])
+
+#### Projection sur 25ans pour les hommes
+#indd=ind[57:70,1]
+h=30
+#ind_pr=indd
+#a=sum(ind_pr)## compte le nombre de 1 pour Ic
+c1=kt1_pred[1:h]
+c2=kt2_pred[1:h]
+c3=kt3_pred[1:h]
+c4=kt4_pred[1:h]
+
+ch_beg=years.fit[n.t]+1-ages.fit[n.a] ### start of cohort forecasts
+ch_end=years.fit[n.t]+h-ages.fit[1] ### end of cohort forecasts
+gac=c(gg[(ch_beg-cohort[1]+1):(tail(cohort,1)-cohort[1]+1),1],gg[(tail(cohort,1)-cohort[1]+2):(ch_end-cohort[1]+1),2])
+
+#c5=kt5_pred[1:a]
+axx=model$ax
+teta=c(axx,c1,c2,c3,c4,gac)
+
+
+
+n.a=length(ages.fit)
+n.t=length(c1)
+n=n.a*n.t
+n.c=n.a+n.t-1
+  
+x=ages.fit
+x.bar=mean(x)
+
+  
+
+#I_t=indd  
+  
+  ###Constructiion de la matrice de kt_5
+#m=diag(I_t)
+#t=dim(m)[2]
+#v=c()
+#u=sapply(1:t,function(x){sum(m[,x])})
+#for(i in 1:length(u))
+#{
+#  if (u[i]!=0)
+#  {
+#    v=cbind(v,m[,i])
+# }
+#}
+#I_t=v
+  
+#n.t5=dim(I_t)[2]
+  
+
+c_x=0.4
+a_c=65
+  #### 1) Matrice d'âge
+X_a=kronecker(as.matrix(rep(1,n.t)),diag(n.a))
+
+  #### 2) Matrice de période kt1
+X_t1=kronecker(diag(n.t),as.matrix(rep(1,n.a)))
+  
+  #### 3) Matrice de période kt2
+X_t2=kronecker(diag(n.t),as.matrix(x.bar-x))
+  
+  #### 4) Matrice de période kt3
+X_t3=kronecker(diag(n.t),as.matrix(pmax(x.bar-x,0)))
+
+  #### 4) Matrice de période kt4
+X_t4=kronecker(diag(n.t),as.matrix((pmax(45-x,0)+(pmax(x-60)))^2))
+  
+  #### 5) Matrice de période kt5
+#X_t5=kronecker(I_t,as.matrix(c_x*pmax(x-a_c,0)^2))
+  
+  ### Matrice de cohorte
+X_c=indic(matrix(0,n,n.c),n.a,n.t)
+  
+  
+  
+  #### Enfin on obtient
+X=cbind(X_a,X_t1,X_t2,X_t3,X_t4,X_c)
+
+mu=X%*%teta
+```
+
+
+```{r}
+years_pred=(tail(years.fit,1)+1):(tail(years.fit,1)+h)
+log_mu=matrix(mu,nrow = n.a,dimnames =list(ages.fit,years_pred))
+mod_mu=exp(log_mu)
+```
+
+```{r}
+male_rate=data$rate$male
+female_rate=data$rate$female
+mx_test=male_rate[1:101,191:204]
+mape_mod=mean(abs(mod_mu-mx_test)/mx_test)
+mape_mod
+```
+
+```{r}
+plot(ts(mod_mu[85,],start = 2018))
+male_rate=data$rate$male
+mx_test=male_rate[1:101,201:204]
+mape_mod=mean(abs(mod_mu-mx_test)/mx_test)
+mape_mod
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+### mx réel 
+mx=model$Dxt/model$Ext
+
+### mx estimé par le modèle proposé
+mod_mxt=fit_model(model,ages.fit,years.fit)$uxt_fit
+
+### mx estimé par SPO
+#SPO_mean_uxt=fitted(SPOMale_mean,type = "rates")
+
+a=50
+mx_65=ts(male_rate[a,135:200],start=1950,frequency = 1)
+mu_fit_65=ts(mod_mu[a,],start = 2016,frequency = 1)
+plot(mx_65,type='l',xlim=c(1950,2020),ylim=c(0.1,0.4),lwd=3)
+lines(mu_fit_65,type='l',col='red',lwd=3)
+#lines(ts(fore_spomean$rates[a,],start=2016,frequency = 1),lwd=3)
+lines(ts(mod_mxt[a,],start=1950,frequency = 1),col='blue',lwd=3)
+lines(ts(male_rate[a,201:204],start=2016,frequency = 1),col="orange",lwd=3)
+```
+
+```{r}
+mx=model$Dxt/model$Ext
+mx_65=ts(mx[65,],start=1950,frequency = 1)
+#mx_fit=ts(mu_fit_65,start=1950,frequency = 1)
+plot(mx_65,type='l',xlim=c(1950,2044))
+lines(mu_fit_65,color='red')
+```
+
+### Prévision des séries temporelles pour les données des femmes
+
+```{r}
+### kt1
+kt1f=ts(model_fem$kt1,start=1950,frequency = 1)
+fit1f=auto.arima(kt1f)
+fore_1f=forecast(fit1f, h=50)
+kt1_predf=fore_1f$mean
+plot(fore_1f)
+```
+
+```{r}
+### kt2
+kt2f=ts(model_fem$kt2,start=1950,frequency = 1)
+fit2f=auto.arima(kt2f)
+fore_2f=forecast(fit2f,h=50)
+kt2_predf=fore_2f$mean
+plot(fore_2f)
+```
+
+```{r}
+### kt3
+kt3f=ts(model_fem$kt3,start=1950,frequency = 1)
+fit3f=auto.arima(kt3f)
+fore_3f=forecast(fit3f,h=50)
+kt3_predf=fore_3f$mean
+plot(fore_3f)
+```
+
+```{r}
+### kt4
+kt4f=ts(model$kt4,start=1950,frequency = 1)
+fit4f=auto.arima(kt4f)
+fore_4f=forecast(fit4f,h=50)
+kt4_predf=fore_4f$mean
+plot(fore_4f)
+```
+
+#### Prévision de kt5
+
+```{r}
+Reg = function(x , y , h = 3){
+  n = length(x)
+  vect.x = NULL
+  vect.y = NULL
+  for(i in 1:(n-1)){
+    a = (y[i+1] - y[i])/(x[i+1] - x[i])
+    b = y[i] - a*x[i]
+    dx = (x[i+1] - x[i])/(h+1)
+    current.x = x[i]
+    vect.x = c(vect.x , x[i])
+    vect.y = c(vect.y , y[i])
+    for(step in 1:h){
+      current.x = current.x + dx
+      current.y = a*current.x + b
+      vect.x = c(vect.x , current.x)
+      vect.y = c(vect.y , current.y)
+    }
+  }
+  vect.x = c(vect.x , x[n])
+  vect.y = c(vect.y , y[n])
+  return(list("x" = vect.x, 
+              "y" = vect.y))
+}
+
+```
+
+```{r}
+kt5=plot(x=c(1975,1983,1990,2003,2006,2015),model_fem$kt5,col='blue',xlab="année_caniculaire",ylab="kt5",main="Graphique kt5 pour les femmes")
+```
+
+```{r}
+x = seq(from = 1 , to = 6 , by = 1)
+y = kt5[1:6]
+par(mfrow = c(1 , 1))
+plot(x , y , type = "l")
+points(x , y , col = "red")
+l = Reg(x , y)
+points(l$x , l$y , col = "blue")
+```
+
+```{r}
+kt5_est=ts(l$y,start=1,frequency = 1)
+fit5=auto.arima(kt5_est)
+fore_5=forecast(fit5,h=20)
+kt5_pred=fore_5$mean
+plot(fore_5)
+```
+
+```{r}
+kt5_pred
+```
+
+```{r}
+kt5f=ts(model_fem$kt5,start=1,frequency = 1)
+#plot(kt5)
+fit5f=arima(kt5f,order = c(2,1,0))
+fore_5f=forecast(fit5f,h=20)
+kt5_predf=fore_5f$mean
+plot(fore_5f)
+```
+
+```{r}
+### gc
+gf=ts(model_fem$gc,start=1850,frequency=1)
+plot(gf)
+fit_gcf=arima(gf,order = c(1,2,1))
+pcf=forecast(fit_gcf,h=50)
+gc_predf=pcf$mean
+plot(pcf)
+```
+
+```{r}
+ggf=cbind(gf,gc_predf)
+
+```
+
+```{r}
+#### Projection sur 25ans pour les femmes
+
+a=sum(ind_pred[1:20,1])## compte le nombre de 1 pour Ic
+c1f=kt1_predf[1:20]
+c2f=kt2_predf[1:20]
+c3f=kt3_predf[1:20]
+c4f=kt4_predf[1:20]
+gacf=c(ggf[67:166,1],ggf[167:186,2])
+c5f=kt5_predf[1:a]
+axxf=model_fem$ax
+tetaf=c(axxf,c1f,c2f,c3f,c4f,c5f,gacf)
+
+
+n.a=101
+n.t=length(c1f)
+n=n.a*n.t
+n.c=n.a+n.t-1
+  
+x=ages.fit
+x.bar=mean(x)
+
+  
+
+I_t=ind_pred[1:20,1]  
+  
+  ###Constructiion de la matrice de kt_5
+m=diag(I_t)
+t=dim(m)[2]
+v=c()
+u=sapply(1:t,function(x){sum(m[,x])})
+for(i in 1:length(u))
+{
+  if (u[i]!=0)
+  {
+    v=cbind(v,m[,i])
+  }
+}
+I_t=v
+  
+n.t5=dim(I_t)[2]
+  
+
+c_xf=0.43
+a_c=65
+  #### 1) Matrice d'âge
+X_a=kronecker(as.matrix(rep(1,n.t)),diag(n.a))
+
+  #### 2) Matrice de période kt1
+X_t1=kronecker(diag(n.t),as.matrix(rep(1,n.a)))
+  
+  #### 3) Matrice de période kt2
+X_t2=kronecker(diag(n.t),as.matrix(x.bar-x))
+  
+  #### 4) Matrice de période kt3
+X_t3=kronecker(diag(n.t),as.matrix(pmax(x.bar-x,0)))
+
+  #### 4) Matrice de période kt4
+X_t4=kronecker(diag(n.t),as.matrix(pmax(x.bar-x,0)^2))
+  
+  #### 5) Matrice de période kt5
+X_t5f=kronecker(I_t,as.matrix(c_xf*pmax(x-a_c,0)^2))
+  
+  ### Matrice de cohorte
+X_c=indic(matrix(0,n,n.c),n.a,n.t)
+  
+  
+  
+  #### Enfin on obtient
+Xf=cbind(X_a,X_t1,X_t2,X_t3,X_t4,X_t5f,X_c)
+
+mu_fem=Xf%*%tetaf
+```
+
+```{r}
+log_mu_fem=matrix(mu_fem,nrow = 101,dimnames =list(ages.fit,2016:2035))
+mod_muf=exp(log_mu_fem)
+```
+
+```{r}
+male_rate=data$rate$male
+female_rate=data$rate$female
+mx_testf=female_rate[1:101,201:204]
+mape_modf=mean(abs(mod_muf[,1:4]-mx_testf)/mx_testf)
+mape_modf
+```
+
+```{r}
+### mx réel 
+mx_fem=model_fem$Dxt/model_fem$Ext
+
+### mx estimé par le modèle proposé
+mod_mxt_fem=fit_model(model_fem,ages.fit,years.fit)$uxt_fit
+
+### mx estimé par SPO
+SPOfe_max_uxt=fitted(SPOFem_max,type = "rates")
+
+a=80
+mx_fem_a=ts(mx_fem[a,],start=1950,frequency = 1)
+mu_fem_fit_a=ts(exp(log_mu_fem[a,]),start = 2020,frequency = 1)
+plot(mx_fem_a,type='l',xlim=c(1950,2044),ylim=c(0.001,0.1),lwd=3)
+lines(mu_fem_fit_a,type='l',col='red',lwd=3)
+#lines(ts(fore_spomean$rates[a,],start=2020,frequency = 1),lwd=3)
+lines(ts(mod_mxt_fem[a,],start=1950,frequency = 1),col='blue',lwd=3)
+lines(ts(SPOfe_max_uxt[a,],start=1950,frequency = 1),col="orange",lwd=3)
+```

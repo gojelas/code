@@ -10,27 +10,29 @@ library(tseries)
 #                       "/media/gouthonabiodunjean-luc/GOJELA'S/Thèse/Correction du modèle/données/Exposures_1x1.txt", 
 #                       type="mortality", label="France")
 
-data <- read.demogdata("/Users/gojelastat/Downloads/Thèse/Données/Mx_1x1.txt",
-                       "/Users/gojelastat/Downloads/Thèse/Données/Exposures_1x1.txt", 
+data <- read.demogdata("Mx_1x1.txt",
+                       "Exposures_1x1.txt", 
                        type="mortality", label="France")
 
 FraMaleData=StMoMoData(data, series = names(data$rate)[2], type ="central")
 
 
-#data <- read.demogdata("/media/gouthonabiodunjean-luc/GOJELA'S/Thèse/Correction du modèle/données/Mx_1x1 (UK).txt",
-#                       "/media/gouthonabiodunjean-luc/GOJELA'S/Thèse/Correction du modèle/données/Exposures_1x1 (UK).txt", 
-#                       type="mortality", label="France")
-#UKMaleData=StMoMoData(data, series = names(data$rate)[2], type ="central")
-
-
 FraFemaleData=StMoMoData(data, series = names(data$rate)[1], type ="central")
 
-#### 1) heat wave indicator
-#ind=read.csv("/Volumes/GOJELA'S/Thèse/Correction du modèle/données/indicateur2.csv",row.names = 1)
-#ind=read.csv("/media/gouthonabiodunjean-luc/GOJELA'S/Thèse/Correction du modèle/données/indicateur2.csv",row.names = 1)
-ind=read.csv("/Users/gojelastat/Downloads/Thèse/Données/indicateur2.csv",row.names = 1)
+#ind=read.csv("/Users/gojelastat/Downloads/Thèse/Données/indicateur2.csv",row.names = 1)
 
-source(file="/Users/gojelastat/Desktop/Thèse/fonctions_model.R")
+#source(file="/Users/gojelastat/Desktop/Thèse/fonctions_model.R")
+
+
+
+FraFeMaleData$Dxt=reshape_french_data(FraFeMaleData)$dxt
+FraFeMaleData$Ext=reshape_french_data(FraFeMaleData)$ext
+female_rate=FraFeMaleData$Dxt/FraFeMaleData$Ext
+
+
+FraMaleData$Dxt=reshape_french_data(FraMaleData)$dxt
+FraMaleData$Ext=reshape_french_data(FraMaleData)$ext
+male_rate=FraMaleData$Dxt/FraMaleData$Ext
 
 
 ############################################
@@ -229,8 +231,6 @@ plat_function=function(dxt,ext,wxt,ages,years)
 ##############################################
 
 ### compute model
-
-
 ages.fit=20:85
 years.fit=1980:2011
 fr_m=FraMaleData$Dxt[21:86,(1980-1816+1):(2011-1816+1)]
@@ -238,7 +238,24 @@ fr_e=FraMaleData$Ext[21:86,(1980-1816+1):(2011-1816+1)]
 wei=genWeightMat(ages=ages.fit,years=years.fit)
 plat=plat_function(fr_m,fr_e,wei,ages.fit,years.fit)
 
-fit_model(plat,20:85,1980:2011)$
+
+
+fit_model(plat,20:85,1980:2011)
+
+par(mfrow=c(1,3))
+plot(plat$kt1)
+plot(spo_$kt4)
+plot(model_f_new$kt1)
+
+
+
+kt1=ts(plat$gc,start=years.fit[1],frequency = 1)
+fit1=auto.arima(kt1)
+fore_1=forecast(fit1, h=50)
+kt1_pred=fore_1$mean
+plot(fore_1)
+
+fit2=Arima(kt1,order = c(1,1,1))
 
 
 plat_criteria=get_criterion(plat,FraMaleData,ages.fit,years.fit)
@@ -297,7 +314,7 @@ get_predict_plat=function(estim,years_pred)
   kt3_pred=fore_3$mean
   
   
-  fit_gc=auto.arima(estim$g)
+  fit_gc=Arima(estim$g, order = c(1,1,1))
   pc=forecast(fit_gc,h=150)
   gc_pred=pc$mean
   
@@ -438,6 +455,8 @@ IC_plat=inf_conf_plat(FraMaleData,20:85,1980:2011,2012:2019,B = 100)
 
 plat=get_estimation_plat(FraMaleData,20:85,1980:2011)
 mu_pred=get_predict_plat(plat,2012:2019)$mxt_pred
+plat_pred=get_predict_plat(plat,2012:2019)$mxt_pred
+
 
 a=50
 plot(ts(mu_pred[a,],start = 2012),col=1)
@@ -455,10 +474,53 @@ lines(ts(IC_plat$IC_min[a,],start = 2012),col=4)
 mx_test=male_rate[21:86,197:204]
 #plot(ts(plat_mu[20,],start = 2012))
 #lines(ts(mx_test[20,],start = 2012),col="red")
-mape_plat=mean(abs(plat_mu-mx_test)/mx_test)
+mape_plat=mean(abs(plat_pred-mx_test)/mx_test)
 mape_plat
 ### mape sur 2012-2019, 0.2248657
 
+
+
+
+
+
+
+
+
+
+##############################################
+#### Application to female data from France ####
+##############################################
+
+### compute model
+
+
+ages.fit=20:85
+years.fit=1980:2011
+fr_m=FraFeMaleData$Dxt[21:86,(1980-1816+1):(2011-1816+1)]
+fr_e=FraFeMaleData$Ext[21:86,(1980-1816+1):(2011-1816+1)]
+wei=genWeightMat(ages=ages.fit,years=years.fit)
+plat_f=plat_function(fr_m,fr_e,wei,ages.fit,years.fit)
+
+fit_model(plat_f,20:85,1980:2011)
+
+par(mfrow=c(1,3))
+plot(plat_f$kt4)
+plot(spo_f$kt4)
+plot(model_f_new$kt5)
+
+
+
+kt1=ts(plat_f$gc,start=years.fit[1],frequency = 1)
+fit1=auto.arima(kt1)
+fore_1=forecast(fit1, h=50)
+kt1_pred=fore_1$mean
+plot(fore_1)
+
+fit2=Arima(kt1,order = c(1,1,1))
+
+
+plat_criteria_f=get_criterion(plat_f,FraFeMaleData,ages.fit,years.fit)
+plat_criteria_f
 
 
 

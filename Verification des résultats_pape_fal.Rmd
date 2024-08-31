@@ -66,7 +66,7 @@ SPOMale_mean=fit(SPO,FraMaleData,ages.fit=ages.fit,years.fit=years.fit,wxt=wxt)
 
 ```{r}
 ### Les critères du modèle
-print(c(AIC(SPOMale_mean),BIC(SPOMale_mean),SPOMale_mean$deviance,mape(SPOMale_mean)))
+print(c(AIC(SPOMale_mean),BIC(SPOMale_mean),SPOMale_mean$deviance))#,mape(SPOMale_mean)))
 ```
 
 ```{r}
@@ -98,7 +98,7 @@ fitgc
 
 ```{r}
 
-SPO_sim=simulate(SPOMale_mean,nsim = 5000,h=80,gc.order = c(4,0,4))
+SPO_sim=simulate(SPOMale_mean,nsim = 5000,h=80,gc.order = c(4,0,4),kt.method = 'iarima')
 
 
 qxt <- SPOMale_mean$Dxt / SPOMale_mean$Ext
@@ -106,7 +106,22 @@ plot(SPOMale_mean$years, qxt["75", ], xlim = range(SPOMale_mean$years, SPO_sim$y
 
 matlines(SPO_sim$years, SPO_sim$rates["75", , 1:500], type = "l", lty = 1)
 
+matlines(SPO_sim$gc.s$cohorts, SPO_sim$gc.s$sim[, 1:80], type = "l", lty = 1)
+
 ```
+
+```{r}
+plot(SPOMale_mean$cohorts, SPOMale_mean$gc, xlim = range(SPOMale_mean$cohorts,SPO_sim$gc.s$cohorts), ylim = range(SPOMale_mean$gc,SPO_sim$gc.s$sim[, 1:20], na.rm = TRUE), type = "l", xlab = "year", ylab = "kt", main = "Cohort index (ARIMA(1,1,0) with drift)")
+
+matlines(SPO_sim$gc.s$cohorts, SPO_sim$gc.s$sim[, 1:80], type = "l", lty = 1)
+```
+
+
+```{r}
+SPO_sim$kt.method
+```
+
+
 
 
 ```{r}
@@ -141,21 +156,94 @@ lines(m_min)
 
 
 ```{r}
-mean_sp=mean(SPO_sim$rates[75,,])
+
 ```
 
 
 ```{r}
 library(fanplot)
 probs = c(2.5, 10, 25, 50, 75, 90, 97.5)
-matplot(SPOMale_mean$years, t(qxt[c(m_min[i]=mean_-1.96*stdr/sqrt(500) "85"), ]),
-        xlim = c(1960, 2061), ylim = c(0.0025, 0.2), pch = 20, col = "black",
+matplot(SPOMale_mean$years, t(qxt[c("65", "75", "85"), ]),
+        xlim = c(1960, 2061), ylim = c(0.0025, 0.2+1), pch = 20, col = "black",
         log = "y", xlab = "year", ylab = "mortality rate (log scale)")
 fan(t(SPO_sim$rates["85", , ]), start = 2017, probs = probs, n.fan = 4,
     fan.col = colorRampPalette(c("red", "white")), ln = NULL)
 ```
 
 
+```{r}
+plot()
+fan(t(SPO_sim$rates["85", , ]), start = 2017, probs = probs, n.fan = 1,
+    fan.col = colorRampPalette(c("red", "white")), ln = NULL)
+
+```
+
+
+```{r}
+#create time series
+net <- ts(ips$net, start=1975)
+
+# fit model
+library("forecast")
+m <- auto.arima(net)
+
+# plot in forecast package (limited customisation possible)
+plot(forecast(m, h=5))
+
+# another plot in forecast (with some customisation, no
+# labels or anchoring possible at the moment)
+plot(forecast(m, h=5, level=c(50,80,95)), 
+     shadecols=rev(heat.colors(3)))
+
+```
+
+
+```{r}
+# simulate future values
+mm <- matrix(NA, nrow=1000, ncol=5)
+for(i in 1:1000)
+  mm[i,] <- simulate(m, nsim=5)
+
+# interval fan chart
+plot(net, xlim=c(1975,2020), ylim=c(-100,300))
+fan(mm, type="interval", start=2013)
+
+```
+
+
+```{r}
+m_i=m$mu_pred[,60,]
+dim(m_i)
+# interval fan chart
+plot(ts(rate[60,],start=1961), xlim=c(1960,2040))
+fan(m_i, type="interval", start=2012)
+```
+
+
+```{r}
+dim(m$mu_pred)
+```
+
+
+```{r}
+ts1=ts(m$mu_pred[1,1,],start=2000)
+ts2=ts(m$mu_pred[2,1,], start = 2000)
+
+x=rbind(ts1,ts2)
+colnames(x)=2000:2028
+```
+
+
+
+```{r}
+y=mrwd(x)
+simulate(y)
+```
+
+
+```{r}
+y$x
+```
 
 
 

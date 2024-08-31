@@ -1,0 +1,535 @@
+---
+title: "TP StMoMo"
+author: "Jean-Luc"
+date: "2023-04-29"
+output: html_document
+---
+
+```{r}
+library(StMoMo)
+```
+
+```{r}
+EWMaleData
+```
+
+### 1) Modèle LC
+
+$$
+\eta_{xt}=\alpha_x+\beta_x^{(1)}\kappa_t^{(1)}
+$$
+
+La transformation invariante étant:
+
+$$
+\bigg(\alpha_x,\beta_x^{(1)},\kappa_t^{(1)}\bigg)\rightarrow\bigg(\alpha_x+c_1\beta_x^{(1)},\frac{1}{c_2}\beta_x^{(1)},c_2(\kappa_t^{(1)}-c_1)\bigg)
+$$avec
+
+$$
+c_1=\frac{1}{n}\sum_t\kappa_t^{(1)},~~~~~~~~c_2=\sum_x\beta_x^{(1)}
+$$
+
+```{r}
+## Initialisation du modèle
+constLC=function(ax, bx, kt, b0x, gc, wxt, ages)
+{
+  c1=mean(kt[1,],na.rm=TRUE)
+  c2=sum(bx[,1],na.rm=TRUE)
+  list(ax=ax+c1*bx,bx=bx/c2,kt=c2*(kt-c1))
+}
+
+LC=StMoMo(link="log", staticAgeFun = TRUE, periodAgeFun = "NP", constFun = constLC)
+
+#Une autre alternative plus simplifiée est:
+#LC=lc(link="log")
+```
+
+### 2) Modèle CBD
+
+$$
+\eta_{xt}=\kappa_t^{(1)}+(x-\bar{x})\kappa_t^{(2)}
+$$
+
+```{r}
+f2=function(x, ages) x-mean(ages)
+CBD=StMoMo(link="logit",staticAgeFun = FALSE,periodAgeFun = c("1",f2))
+
+#Une autre alternative étant 
+#CBD=cbd()
+```
+
+### 3) Modèle APC
+
+$$
+\eta_{xt}=\alpha_x+\kappa_t^{(1)}+\gamma_{t-x}
+$$
+
+Le prédicteur restant invariante par la transformation:
+
+$$
+\bigg(\
+$$
+
+```{r}
+constAPC=function(ax, bx, kt, b0x, gc, wxt, ages)
+{
+  nYears=dim(wxt)[2]
+  t=1:nYears
+  x=ages
+  c1=mean(kt[1,],na.rm=TRUE)
+  ax=ax+c1
+  kt[1,]=kt[1,]-c1
+  c=(1-tail(ages,1)):(nYears-ages[1])
+  phireg=lm(gc~1+c,na.action =na.omit)
+  phi=coef(phireg)
+  ax=ax+phi[1]-phi[2]*x
+  kt[1,]=kt[1,]+phi[2]*t
+  gc=gc-phi[1]-phi[2]*c
+  list(ax=ax,bx=bx,kt=kt,b0x=b0x,gc=gc)
+}
+APC2=StMoMo(link="log",staticAgeFun = TRUE,periodAgeFun = "1",cohortAgeFun = "1",constFun = constAPC)
+```
+
+### 3) Modèle RH
+
+$$
+\eta_{xt}=\alpha_x+\beta_x^{(1)}\kappa_t^{(1)}+\gamma_{t-x}
+$$
+
+```{r}
+constRH=function(ax, bx, kt, b0x, gc, wxt, ages)
+{
+  c1=mean(kt[1,],na.rm=T)
+  c2=mean(gc,na.rm=T)
+  c3=sum(bx[,1],na.rm = T)
+  c4=sum(b0x,na.rm = T)
+  list(ax=ax+c1*bx+c2*b0x,bx=(1/c3)*bx,kt=c3*(kt-c1),b0x=(1/c4)*b0x,gc=c4*(gc-c2))
+}
+RH=StMoMo(link='log',staticAgeFun = TRUE,periodAgeFun = "NP",cohortAgeFun = "NP",constFun = constRH)
+RH2=rh(link='log',cohortAgeFun = "1")
+```
+
+### 3) Modèle PLAT
+
+Ce modèle n'est pas prédéfini dans le package StMoMo.
+
+$$
+\eta_{xt}=\alpha_x+\kappa_t^{(1)}+(\bar{x}-x)\kappa_t^{(2)}+\gamma_{t-x}
+$$
+
+```{r}
+f3=function(x,ages) mean(ages)-x
+f4=function(x,ages) pmax(0,mean(ages)-x)
+constPL=function(ax, bx, kt, b0x, gc, wxt, ages)
+{
+  nYears=dim(wxt)[2]
+  x=ages
+  t=1:nYears
+  xbar=mean(ages,na.rm=T)
+  c=(1-tail(ages,1)):(nYears-ages[1])
+  
+  phireg=lm(gc~1+c+I(c^2),na.action = na.omit)
+  phi=coef(phireg)
+  
+  gc=gc-phi[1]-phi[2]*c-phi[3]*c^2
+  kt[1,]=kt[1,]+phi[2]*t+phi[3]*(t^2-2*xbar*t)
+  kt[2,]=kt[2,]+2*phi[3]*t
+  kt[3,]=kt[3,]
+  ax=ax+phi[1]-phi[2]*x+phi[3]*x^2
+  
+  ci=rowMeans(kt,na.rm = TRUE)
+  kt[1,]=kt[1,]-ci[1]
+  kt[2,]=kt[2,]-ci[2]
+  kt[3,]=kt[3,]-ci[3]
+  ax=ax+ci[1]+ci[2]*(xbar-x)+ci[3]*(pmax(xbar-x,0))
+  
+  list(ax=ax,bx=bx,kt=kt,b0x=b0x,gc=gc)
+}
+PLAT=StMoMo(link="log",staticAgeFun = TRUE,periodAgeFun = c("1",f3,f4),constFun = constPL,cohortAgeFun = "1")
+
+```
+
+### 4) Modèle OAL
+
+```{r}
+f1=function(x,ages) mean(ages,na.rm = T)-x
+f2=function(x,ages) pmax(mean(ages)-x,0)+(pmax(mean(ages)-x,0))^2
+constOAL=function( ax, bx, kt, b0x, gc, wxt, ages)
+{
+  nYears=dim(wxt)[2]
+  t=1:nYears
+  x=ages
+  xbar=mean(ages,na.rm=T)
+  c=(1-tail(ages,1)):(nYears-ages[1])
+  phireg=lm(gc~1+c+I(c^2),na.action = na.omit)
+  phi=coef(phireg)
+  ax=ax+phi[1]-phi[2]*x+phi[3]*x^2
+  kt[1,]=kt[1,]+phi[2]*t+phi[3]*(t^2-2*xbar*t)
+  kt[2,]=kt[2,]+2*phi[3]*t
+  gc=gc-phi[1]-phi[2]*c-phi[3]*c^2
+  
+  ci=rowMeans(kt,na.rm = T)
+  ax=ax+ci[1]+ci[2]*(xbar-x)+ci[3]*(pmax(xbar-x,0)+(pmax(xbar-x,0))^2)
+  kt[1,]=kt[1,]-ci[1]
+  kt[2,]=kt[2,]-ci[2]
+  kt[3,]=kt[3,]-ci[3]
+  
+  list(ax=ax,bx=bx,kt=kt,b0x=b0x,gc=gc)
+}
+OAL=StMoMo(link='log',staticAgeFun = T,periodAgeFun = c("1",f1,f2),cohortAgeFun = '1',constFun = constOAL)
+```
+
+```{r}
+```
+
+## Fit Model
+
+However, in our examples we concentrate on ages 55 to 89 as the CBD model and the M7 model have been
+particularly designed to fit higher ages. Additionally, since some models include cohort effects and
+in agreement with the usual practice (see e.g Cairns et al. (2009) and Haberman and Renshaw (2011)),
+we exclude (by setting $ω_{xt} = 0$) all cohorts that have fewer than three observations. Missing
+values for either death counts or exposures are automatically zero-weighted
+
+### a) Application avec les données EWMData des hommes en Engleterre
+
+```{r}
+mxt=EWMaleData$Dxt/EWMaleData$Ext
+
+plot(log(mxt[,1]),col="blue",xlab="age",ylab="log_mortality",type="n",ylim=c(-10,2)) 
+n=(dim(mxt[0,]))[2]
+for (i in 1:n){
+  lines(log(mxt[,i]),col=i)
+}
+ax=sapply(1:101,function(x){mean(log(mxt[x,]))})
+points(ax,pch=16)
+
+
+plot(log(mxt[55,]),col="blue",xlab="year",ylab="",type="n",ylim=c(-10,-2))
+n=(dim(mxt[,0]))[1]
+for (i in c(10,15,20,35,40,50,60,65,80)){
+  lines(log(mxt[i,]),col=i,)
+}
+legend(x=1,y=-4,legend=c(80,65,60,50,40,35,20,15,10),col=c(80,65,60,50,40,35,20,15,10),lty=1:2, cex=0.8)
+
+plot(log(mxt[50,]),col="blue",xlab="year",ylab="",type="l") 
+```
+
+$\textbf{Interprétation}:$ Lorsqu'on regarde l'évolution du taux de mortalité pour chaque âge en
+fonction de l'année calendaire, on remarque une distribution plus moins linéaire avec une
+translation autour de l'âge moyen. Ce qui explique l'ajouter l'indice temporel $k_t^{(2)}$ qui
+permet de percer à jour l'évolution de la mortalité entre les âges. Mais le problème qui se pose
+cette dynamique semble être significativement pour des âges en dessous de 40ans à certains chose due
+au SIDA, aux abus d'alcool de drogues et de violences, ce qui explique le pourquoi le modèle CBD
+marche mieux pour les vieux âges. Donc il faudra ajouter un troisième indice $k_t^{(3)}$ pour percer
+à jour la dynamique aux âges inférieurs avec un coefficient.
+
+```{r}
+
+```
+
+```{r}
+plot(log(mxt[,1]),col="blue",xlab="year",ylab="",type="n") 
+n=(dim(mxt[0,]))[2]
+for (i in 1:n){
+  lines(log(mxt[,i]),col=i,type = 'l')
+}
+```
+
+```{r}
+k=dim(EWMaleData$Dxt)[2]
+dt=sapply(1:k,function(x){sum(EWMaleData$Dxt[,x])})
+et=sapply(1:k,function(x){sum(EWMaleData$Ext[,x])})
+
+kt=dt/et
+log(kt)
+plot.new()
+par(mar=c(4,4,3,4))
+plot(log(kt),col="red",type='l')
+par(new=T)
+#plot(log(mxt[1,]),type='l')
+```
+
+```{r}
+```
+
+A partir des expositions centrales, on calcule les expositions initiales en utilisant:
+
+$$
+E_{xt}^{0}=E_{xt}^{c}+\frac{1}{2}d_{xt}
+$$
+
+```{r}
+EWMaleIniData=central2initial(EWMaleData)
+EWMaleIniData$Ext
+```
+
+```{r}
+ages.fit=55:89
+
+## genWeightMat génère la matrice des poids utilisée dans la fonction de log-vraisemmblance et est égale à 0 si la donnée particulière (x,t) est omise ou si la cohorte a un nombre d'observations plus petit que 3, et c'est 1 si la cellule est incluse.
+wxt=genWeightMat(ages=ages.fit,years=EWMaleData$years,clip=3)
+
+#LC fit
+LCfit=fit(LC,data=EWMaleData,ages.fit=ages.fit,wxt =wxt)
+RHfit=fit(RH,data=EWMaleData,ages.fit=ages.fit,wxt=wxt)
+APCfit=fit(APC,data=EWMaleData,ages.fit=ages.fit,wxt=wxt)
+APC2fit=fit(APC2,data=EWMaleData,ages.fit = ages.fit,wxt=wxt)
+CBDfit <- fit(CBD, data = EWMaleData, ages.fit = ages.fit, wxt = wxt)
+
+#M7fit <- fit(M7, data = EWMaleIniData, ages.fit = ages.fit, wxt = wxt)
+PLATfit <- fit(PLAT, data = EWMaleData, ages.fit = ages.fit, wxt = wxt)
+```
+
+```{r}
+#### A titre d'exemple
+ages.fit=5:100
+years.fit=1961:2011
+wxt=genWeightMat(ages=ages.fit,years=years.fit,clip=3)
+LCfit=fit(LC,data=EWMaleData,ages.fit=ages.fit,wxt =wxt)
+
+dxt_fit=matrix(LCfit$fittingModel$fitted.values,nrow=,ncol=51,dimnames = list(ages.fit,years.fit),byrow = T)
+
+plot(dxt_fit[,50],type='l')
+```
+
+```{r}
+plot(LCfit)
+```
+
+```{r}
+plot(CBDfit,parametricbx = FALSE)
+```
+
+```{r}
+CBDfit$npar
+```
+
+```{r}
+plot(LCfit,nCol=3)
+```
+
+```{r}
+ages.fit=55:89
+years.fit=1961:2000
+wxt=genWeightMat(ages=ages.fit,years=years.fit,clip=3)
+RHfit=fit(RH,data=EWMaleData,ages.fit=ages.fit,years.fit = years.fit,wxt=wxt)
+plot(RHfit,parametricbx = FALSE,nCol = 3)
+```
+
+```{r}
+
+```
+
+```{r}
+ages.fit=55:89
+wxt=genWeightMat(ages=ages.fit,years=EWMaleData$years
+,clip=3)
+RHfit=fit(RH,data=EWMaleData,ages.fit=ages.fit,wxt=wxt)
+plot(RHfit,parametricbx = FALSE,nCol = 3)
+```
+
+En changeant la tranche d'âge pour l'estimation des paramètres, on observe une différence
+significative dans les paramètres estimés. L'indice temporel $k_t^{(1)}$ qui était décroissant dans
+le cas de l'estimation des paramètres pour la tranche d'ages 5 à 89ans devient tout d'un coup
+croissant lorsque la tranche est changée en 55:89ans.
+
+De même en changeant la période d'estimation des paramètres, l'ordre de grandeur des paramètres
+change significativement. Ce qui confirme le manque de robustesse de ce modèle.
+
+```{r}
+plot(APCfit,parametricbx = FALSE,nCol=3) 
+```
+
+```{r}
+plot(APC2fit,parametricbx = FALSE,nCol=3)
+```
+
+```{r}
+ages.fit=55:89
+wxt=genWeightMat(ages=ages.fit,years=EWMaleData$years,clip=3)
+PLAfit=fit(PLAT,data=EWMaleData,ages.fit=ages.fit,wxt=wxt)
+plot(PLATfit,parametricbx = FALSE,nCol = 3)
+```
+
+```{r}
+ages.fit=55:89
+years.fit=1961:2000
+wxt=genWeightMat(ages=ages.fit,years=years.fit,clip=3)
+PLATfit=fit(PLAT,data=EWMaleData,ages.fit=ages.fit,years.fit = years.fit,wxt=wxt)
+plot(PLATfit,parametricbx = FALSE,nCol = 3)
+```
+
+### Modèle OAL
+
+```{r}
+wxt=genWeightMat(ages=ages.fit,years=EWMaleData$years,clip=3)
+OALfit=fit(OAL,data=EWMaleData,ages.fit = ages.fit,wxt=wxt)
+plot(OALfit,parametricbx = F,nCol = 3)
+```
+
+## Goodness-of-fit analysis
+
+#### 1) Analyse des résidus
+
+La qualité de l'ajustement des modèles de mortalité est généralement analysée en inspectant les
+résidus du modèle ajusté. Des tendances régulières dans les résidus indiquent l'incapacité du modèle
+à décrire correctement toutes les caractéristiques des données. Avec une composante aléatoire de
+Poisson ou Binomiale, il convient d'examiner les résidus de déviance standardisés définis comme
+suit:
+
+$$
+r_{xt}=sign(d_{xt}-\hat{d}_{xt})\sqrt{\frac{dev(x,t)}{\hat{\phi}}},~~~~~~\hat{\phi}=\frac{D(d_{xt},\hat{d}_{xt}}{K-v}
+$$
+
+où
+
+$$
+dev(x,t)=2\bigg[d_{xt}\log\bigg(\frac{d_{xt}}{\hat{d}_{xt}}\bigg)-(d_{xt}-\hat{d}_{xt})\bigg]
+$$
+
+pour une composante aléatoire de Poisson, ou
+
+$$
+dev(x,t)=2\bigg[d_{xt}\log\bigg(\frac{d_{xt}}{\hat{d}_{xt}}\bigg)+(E^{0}_{xt}-d_{xt})\log\bigg(\frac{E^0_{xt}-d_{xt}}{E^0_{xt}-\hat{d}_{xt}}\bigg)\bigg]
+$$
+
+pour une composante aléatoire Binomiale.
+
+Par conséquent
+
+$$
+D(d_{xt},\hat{d}_{xt})=\sum_x\sum_tw_{xt}dev(x,t)
+$$
+
+est la déviance totale du modèle, $K=\sum_x\sum_tw_{xt}$ est le nombre d'observations dans les
+données et $v$ est le nombre de paramètres effectif dans le modèle.
+
+### Résidus de LC
+
+```{r}
+LCres=residuals(LCfit)
+plot(LCres,type="scatter",reslim=c(-3.5,3.5))
+plot(LCres,type="colourmap",reslim=c(-3.5,3.5))
+```
+
+### Résidus CBD
+
+```{r}
+CBDres=residuals(CBDfit)
+plot(CBDres,type="scatter",reslim=c(-3.5,3.5))
+plot(CBDres,type="colourmap",reslim=c(-3.5,3.5))
+```
+
+### Résidus APC
+
+```{r}
+APCres=residuals(APCfit)
+plot(APCres,type="scatter",reslim=c(-3.5,3.5))
+plot(APCres,type="colourmap",reslim=c(-3.5,3.5))
+```
+
+### Résidus PLAT
+
+```{r}
+PLATres=residuals(PLATfit)
+plot(PLATres,type="scatter",reslim=c(-3.5,3.5))
+plot(PLATres,type="colourmap",reslim=c(-3.5,3.5))
+```
+
+Les figures présentent des cartes thermiques des résidus de déviance pour les modèles ajustés à
+l'expérience de mortalité masculine en Angleterre et au Pays de Galles. D'après ces graphiques, les
+modèles LC, CBD et APC présentent de fortes tendances résiduelles, tandis que le modèle PLAT semble
+raisonnablement aléatoire. Le modèle APC présente un fort regroupement des résidus en raison de son
+incapacité à prendre en compte des taux d'amélioration variables avec l'âge. Les modèles LC et CBD,
+qui n'intègrent pas d'effet de cohorte, présentent des diagonales très marquées indiquant
+l'incapacité de ces modèles à capturer l'effet de cohorte bien connu dans la population d'Angleterre
+et du Pays de Galles.
+
+Les problèmes d'adéquation des modèles LC et CBD deviennent plus évidents lorsqu'on analyse les
+graphiques de dispersion des résidus par âge, par période et par cohorte. De ces diagrammes, on
+remarque que les panneaux de droite de LC et CBD, montrent que ces deux modèles sont incapables de
+capturer l'effet de cohorte. En outre, le panneau de gauche de la figure CBD, révèle de fortes
+tendances quadratiques en fonction de l'âge, réflètant l'absence d'un terme quadratique lié à l'âge
+dans le CBD, qui pourrait être nécessaire pour capturer la courbure communément observée des taux de
+mortalité dans une échelle logarithmique.
+
+Lors de l'évaluation de la qualité de l'ajustement de différents modèles, on s'attend généralement à
+ce que les modèles comportant davantage de paramètres offrent un meilleur ajustement aux données.
+Pour exclure la possibilité que la meilleure adéquation observée dans un modèle soit le résultat
+d'une paramétrisation excessive et pour comparer la performance relative de plusieurs modèles, il
+est devenu courant dans la littérature sur la mortalité d'utiliser des critères d'information qui
+modifient le critère du MV en pénalisant les modèles.
+
+```{r}
+LC=c(LCfit$npar,AIC(LCfit),BIC(LCfit))
+APC=c(APCfit$npar,AIC(APCfit),BIC(APCfit))
+CBD=c(CBDfit$npar,AIC(CBDfit),BIC(CBDfit))
+PLAT=c(PLATfit$npar,AIC(PLATfit),BIC(PLATfit))
+tab=data.frame(LC=LC,APC=APC,CBD=CBD,PLAT=PLAT,row.names = c("Nombre de paramètre","AIC","BIC"))
+tab
+```
+
+Sur la base de ces deux critères, le modèle le plus performant adapté pour modéliser la mortalité
+dans la population de l'Angleterre et du Pays de Galles est le modèle PLAT.
+
+### Une extension de PLAT
+
+$$
+\ln(m_{xt})=a_x+\kappa^1_t+(\bar{x}-x)\kappa^2_t+(\bar{x}-x)^+\kappa_t^3+([a-x]^+)^2\kappa_t^4+\gamma_{t-x}
+$$
+
+et les contraintes sont obtenues par extensions de celle de PLAT.
+
+```{r}
+f3=function(x,ages) mean(ages)-x
+f4=function(x,ages) pmax(0,mean(ages)-x)
+f5=function(x,ages) (pmax(0,mean(ages)-x))^2
+constPLE=function(ax, bx, kt, b0x, gc, wxt, ages)
+{
+  nYears=dim(wxt)[2]
+  x=ages
+  t=1:nYears
+  xbar=mean(ages,na.rm=T)
+  c=(1-tail(ages,1)):(nYears-ages[1])
+  phireg=lm(gc~1+c+I(c^2),na.action = na.omit)
+  phi=coef(phireg)
+  gc=gc-phi[1]-phi[2]*c-phi[3]*c^2
+  kt[1,]=kt[1,]+phi[2]*t+phi[3]*(t^2-2*xbar*t)
+  kt[2,]=kt[2,]+2*phi[3]*t
+  kt[3,]=kt[3,]
+  ax=ax+phi[1]-phi[2]*x+phi[3]*x^2
+  ci=rowMeans(kt,na.rm = TRUE)
+  kt[1,]=kt[1,]-ci[1]
+  kt[2,]=kt[2,]-ci[2]
+  kt[3,]=kt[3,]-ci[3]
+  kt[4,]=kt[4,]-ci[4]
+  ax=ax+ci[1]+ci[2]*(xbar-x)+ci[3]*(pmax(xbar-x,0))+ci[4]*(pmax(xbar-x,0)^2)
+  
+  list(ax=ax,bx=bx,kt=kt,b0x=b0x,gc=gc)
+}
+PLATE=StMoMo(link="log",staticAgeFun = TRUE,periodAgeFun = c("1",f3,f4,f5),constFun = constPLE,cohortAgeFun = "1")
+```
+
+```{r}
+PLATEfit <- fit(PLATE, data = EWMaleData, ages.fit = ages.fit, wxt = wxt)
+```
+
+```{r}
+plot(PLATEfit,parametricbx = FALSE,nCol = 3)
+```
+
+```{r}
+plot(residuals(PLATEfit),type="colourmap")
+```
+
+```{r}
+data=read.csv("D:/M2PSAV/Stage/Base de données/donnees-synop-essentielles-omm.csv",sep = ';')
+```
+
+```{r}
+EWMaleData$Dxt
+```
+
+```{r}
+help(BIC
+```

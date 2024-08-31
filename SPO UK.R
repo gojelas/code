@@ -134,7 +134,7 @@ spo_function=function(dxt,ext,wxt,c_x,a_c,ages,years)
   
   ### consider cohort that under 1950 years
   n.s=1945-cohort[1]+1 
-  X_c=X_c[,4:n.s]
+  X_c=X_c[,1:n.s]
   n.s=dim(X_c)[2]
   X=cbind(X_a,X_t1,X_t2,X_t3,X_t4,X_c)
   
@@ -207,15 +207,16 @@ spo_function=function(dxt,ext,wxt,c_x,a_c,ages,years)
 
 ### compute model
 
-ages.fit=0:89
+ages.fit=20:85
 years.fit=1974:2006
-uk_d=UKMaleData$Dxt[1:90,(1974-1922+1):(2006-1922+1)]
-uk_e=UKMaleData$Ext[1:90,(1974-1922+1):(2006-1922+1)]
+uk_d=UKMaleData$Dxt[(ages.fit+1),(1974-1922+1):(2006-1922+1)]
+uk_e=UKMaleData$Ext[(ages.fit+1),(1974-1922+1):(2006-1922+1)]
 wei=genWeightMat(ages=ages.fit,years=years.fit)
 a_c=50
 c_x=-0.5
 spo=spo_function(uk_d,uk_e,wei,c_x,a_c,ages.fit,years.fit)
 
+plat=plat_function(uk_d,uk_e,wei,ages.fit,years.fit)
 
 
 
@@ -238,4 +239,4 @@ get_criterion=function(model, data, ages.fit, years.fit)
 
 get_criterion(spo,UKMaleData,ages.fit = ages.fit,years.fit = years.fit)
 
-plot(spo$kt2)
+plot(spo$kt3)

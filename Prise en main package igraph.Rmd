@@ -1,0 +1,55 @@
+---
+title: "Prise en main package igraph"
+output: html_document
+date: "2024-06-07"
+---
+
+```{r}
+library(igraph)
+```
+
+```{r}
+listAretes <- c(1,2, 1,3, 2,4, 3,4)
+g1 <- graph(edges = listAretes, directed = T)
+plot(g1)
+```
+
+Ce que ça donne quand on précise l'ordre du graphe.
+```{r}
+
+g2 <- graph(edges = listAretes, directed = F, n=10)
+plot(g2)
+```
+
+Ce que ça donne avec des noms pour les noeuds. Ici l'ordre du graphe n'est plus accepté en argument. 
+```{r}
+listAretesNom <- c('Eric', 'Erwan', 'Erwan', 'Ana')
+g3 <-graph(edges = listAretesNom)
+plot(g3)
+```
+
+Avec des noeuds isolés.
+```{r}
+g4 <- graph(edges = listAretesNom, isolates = c("Paul","Pierre"))
+plot(g4)
+```
+
+```{r}
+friends <- read.table(file ="/Users/gojelastat/Downloads/Friendship-network_data_2013 (1).csv")
+head(friends)
+```
+
+```{r}
+amis <- graph_from_data_frame(friends, directed = T)
+amis
+```
+
+```{r}
+plot(amis,direc)
+```
+
+
+
+
+
+

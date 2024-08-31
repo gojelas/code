@@ -1,0 +1,99 @@
+```{r}
+
+```
+
+### Algo
+
+-   récupérer les différents $\kappa_t$ du le modèle
+
+-   fitter un auto.arima sur chaque $\kappa_t$ pour recupérer les ordres avec la fonction *arimaorder* de r et les coefficients.
+
+-   Créer un data.frame pour enregistrer chaque simulation
+
+-   for i in range 10000
+
+-   <div>
+
+    -   sim1=arima.sim(list(order=order_k1), ar=ar_kt1_coef, ma=ma_kt1_coef,drift=drift_kt1_coef, n=length(kt1))
+
+    -   kt1_sim=data.frame(kt1_sim,sim1)
+
+    -   fore_1=forecast(sim1,h=30)\$mean
+
+    -   forecast_kt1=data.frame(forecast_kt1,fore_1)
+
+    Répéter ce prcessus pour tous les $\kappa_t$
+
+    -   Récupérer le gamma gc correspondant à la période de projection
+
+    -   prendre le vecteur des projections teta=c(ax,fore_1,fore_2,...,gc)
+
+    -   affecter des valeurs à na, nt, nc
+
+    -   calculer la matrice X=(X_a,X_1,X_2,...,X_c) correspondante
+
+    -   revenir à mxt=X%\*%teta
+
+    -   redimensionner sous forme de matrice de mortalité et la retourner
+
+    </div>
+
+-   Calculer la moyenne des mxt et prendre la moyenne des 2,5% dernier mxt comme la borne inférieure et 2,5% plus grand comme borne sup de l'intervalle de confiance.
+
+### Algo_pour vérifiier les informations dans les coefficients d'un fit arima
+
+-   On suppose que le fit en question c'est fit1
+
+-   Avec arimaorder(fit1), déterminer l'ordre des ar et ma de la matrice (cela nous donne l'information sur la taille des coefficients ar+ma et s'il y a de drift ar+ma+1
+
+-   si length(coefficient)==ar+ma,
+
+    -   si ar!=0
+
+    -   <div>
+
+        -   si ma!=0 alors ar_coef1=coefficients[1:ar] et ma_coef1=coefficients[ar+1:ar+ma]
+
+        -   si ma=0 alors ar_coef1=coefficients[1:ar] et ma_coef1=0
+
+        </div>
+
+    -   sinon
+
+        <div>
+
+        -   ma_coef1=coefficients[1:ar+ma]
+
+        -   ar_coef1=0
+
+        </div>
+
+-   Sinon si length(coefficient)==ar+ma+1
+
+-   <div>
+
+    -   si ar!=0
+
+    -   <div>
+
+        -   si ma!=0 alors ar_coef1=coefficients[1:ar] et ma_coef1=coefficients[ar+1:ar+ma], drift=coefficients[ar+ma+1]
+
+        <!-- -->
+
+        -   si ma=0 alors ar_coef1=coefficients[1:ar] et ma_coef1=0, drift=coefficients[ar+ma+1]
+
+        </div>
+
+    -   sinon
+
+        <div>
+
+        -   ma_coef1=coefficients[1:ar+ma]
+
+        -   ar_coef1=0
+
+        -   drift=coefficients[ar+ma+1]
+
+        </div>
+
+    </div>
