@@ -667,7 +667,7 @@ get_best_params_new_model=function(data,c,x1,x2,ages,years,Ic,method="ARIMAX")
 
 
 sim_ic_method_new_model=function(model, ages.fit, years.fit, years.pred, x1, x2, c, 
-                                 a_c=65, N=100,i=1,method="ARIMA")
+                                 a_c=65, N=100,i=1,method="ARIMAX")
 {
   
   "
