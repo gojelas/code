@@ -1241,7 +1241,7 @@ param_incertitude=function(data,ages,years,years_pred,c,x1,x2,B=100)
 {
   "
   Cette fonction génère des simulations semi-boostrap. L'idée générale, 
-  c'est qu'on simule B échantillon i.i.d de poisson de moyenne (d_{x,t} ou \hat{d}_{x,t}) 
+  c'est qu'on simule B échantillon i.i.d de poisson de moyenne (d_{x,t} ou hat{d}_{x,t}) 
   et à partir de ces B échantillons on estime puis projette les taux de mortalité à partir 
   pour chacun des B. Et à partir de ces derniers on construit l'intervalle de confiance basé sur
   les paramètres du modèle.
@@ -1254,7 +1254,6 @@ param_incertitude=function(data,ages,years,years_pred,c,x1,x2,B=100)
       
   Returns:
       mu_pred: tensor with shape [B, ages, years_pred]
-      
   "
   a_min=data$ages[1]
   a_max=tail(data$ages,1)
