@@ -202,7 +202,7 @@ r=ts(rate[a,years_start:years_end],start = 2000)
 #text(0.5,0.5,"",cex=2,font=2)
 plot(r,col=1,xlim=c(2000,2100),
        ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",main="Male-age 25")
+     xlab="years",ylab="central mortality rate",main="Male-age 55")
 fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
@@ -217,7 +217,7 @@ probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 45")
+     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 65")
 fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
@@ -235,7 +235,7 @@ probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred$mxt_pred[a,])-0.004,max(rate[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 65")
+     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 75")
 fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
@@ -250,7 +250,7 @@ probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred$mxt_pred[a,])-0.01,max(rate[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main='Male-age 75')
+     xlab="years",ylab="central mortality rate",pch=20,main='Male-age 85+')
 fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
@@ -357,11 +357,11 @@ mape_pred
 #sim2_f=sim_ic_method2(model2_f,ages.fit = 20:85,years.fit = 1980:2011,
 #                    years.pred = 2012:2040,x1 = 45, x2=60,c=0,N=5000,kt5_order = c(2,0,1),val = FALSE)
 
-sim2_f_new=sim_ic_method_new_model(model2_f,ages.fit = 20:85,years.fit = 1980:2011,
-                                  years.pred = 2012:2100,x1 = 45, x2=60,c=0.11,N=5000, method = "ARIMAX")
+#sim2_f_new=sim_ic_method_new_model(model2_f,ages.fit = 20:85,years.fit = 1980:2011,
+#                                  years.pred = 2012:2100,x1 = 45, x2=60,c=0.11,N=5000, method = "ARIMAX")
 
 sim2_f_with_iarima=sim_ic_method_new_model(model2_f,ages.fit = 20:85,years.fit = 1980:2011,
-                                   years.pred = 2012:2100,x1 = 45, x2=60,c=0.11,N=50, method = "ARIMA")
+                                   years.pred = 2012:2100,x1 = 45, x2=60,c=0.11,N=5000, method = "ARIMAX")
 
 
 mu_pred_f=get_predict_new_model(best_model_f,years_pred = 2012:2100,1)
@@ -383,7 +383,7 @@ r=ts(rate_f[a,years_start:years_end],start = 2000)
 #text(0.5,0.5,"",cex=2,font=2)
 plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred_f$mxt_pred[a,])-0.00015,max(rate_f[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",main="Female-age 25")
+     xlab="years",ylab="central mortality rate",main="Female-age 55")
 fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
@@ -398,7 +398,7 @@ probs = c(90, 95)
 r=ts(rate_f[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred_f$mxt_pred[a,])-0.0006,max(rate_f[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 45")
+     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 65")
 fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
@@ -416,7 +416,7 @@ probs = c(90, 95)
 r=ts(rate_f[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred_f$mxt_pred[a,])-0.001,max(rate_f[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 65")
+     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 75")
 fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
@@ -431,7 +431,7 @@ probs = c(90, 95)
 r=ts(rate_f[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred_f$mxt_pred[a,])-0.006,max(rate_f[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main='Female-age 75')
+     xlab="years",ylab="central mortality rate",pch=20,main='Female-age 85+')
 fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
@@ -443,14 +443,21 @@ lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
 
 
 
-model=get_estimation(FraFeMaleData,20:85,1980:2011,c = 0.0,
+
+###########################################################
+# Comparaison des scénarios RCP pour le cas des femmes ####
+###########################################################
+
+
+model=get_estimation_new_model(FraFeMaleData,20:85,1980:2011,c = 0.11,
                      a_c = 65, x1 = 45, x2 = 60)
-mu_pred_2.6_f=get_predict_f(model,2012:2040,1,kt5_order = c(2,0,1))
-mu_pred_4.5_f=get_predict_f(model,2012:2040,2,kt5_order = c(2,0,1))
-mu_pred_8.5_f=get_predict_f(model,2012:2040,3,kt5_order = c(2,0,1))
+mu_pred_2.6_f=get_predict_new_model(model,2012:2100,1, method = "ARIMAX")
+mu_pred_4.5_f=get_predict_new_model(model,2012:2100,2, method = "ARIMAX")
+mu_pred_8.5_f=get_predict_new_model(model,2012:2100,3, method = "ARIMAX")
 
-y1=2025-2012+1
 
+### Année 2050
+y1=2050-2012+1
 rate_male_2.6_f=c(mu_pred_2.6_f$mxt_pred[6,y1], mu_pred_2.6_f$mxt_pred[46,y1], 
                 mu_pred_2.6_f$mxt_pred[56,y1], mu_pred_2.6_f$mxt_pred[61,y1])
 rate_male_4.5_f=c(mu_pred_4.5_f$mxt_pred[6,y1], mu_pred_4.5_f$mxt_pred[46,y1], 
@@ -459,9 +466,21 @@ rate_male_8.5_f=c(mu_pred_8.5_f$mxt_pred[6,y1], mu_pred_8.5_f$mxt_pred[46,y1],
                 mu_pred_8.5_f$mxt_pred[56,y1], mu_pred_8.5_f$mxt_pred[61,y1])
 df1_f=data.frame(data = rbind(rate_male_2.6_f, rate_male_4.5_f, rate_male_8.5_f), 
                row.names = list("RCP 2.6", "RCP 4.5", "RCP 8.5"))
+colnames(df1_f) = list("65ans", )
 df1_f
 
 
-FraMaleData$Ext[76,]
+### Année 2100
+y1=2100-2012+1
+rate_male_2.6_f=c(mu_pred_2.6_f$mxt_pred[6,y1], mu_pred_2.6_f$mxt_pred[46,y1], 
+                  mu_pred_2.6_f$mxt_pred[56,y1], mu_pred_2.6_f$mxt_pred[61,y1])
+rate_male_4.5_f=c(mu_pred_4.5_f$mxt_pred[6,y1], mu_pred_4.5_f$mxt_pred[46,y1], 
+                  mu_pred_4.5_f$mxt_pred[56,y1], mu_pred_4.5_f$mxt_pred[61,y1])
+rate_male_8.5_f=c(mu_pred_8.5_f$mxt_pred[6,y1], mu_pred_8.5_f$mxt_pred[46,y1], 
+                  mu_pred_8.5_f$mxt_pred[56,y1], mu_pred_8.5_f$mxt_pred[61,y1])
+df1_f=data.frame(data = rbind(rate_male_2.6_f, rate_male_4.5_f, rate_male_8.5_f), 
+                 row.names = list("RCP 2.6", "RCP 4.5", "RCP 8.5"))
+df1_f
+
 
 

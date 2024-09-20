@@ -1206,3 +1206,104 @@ sim_ic_method_with_iarima=function(model, ages.fit, years.fit, years.pred, x1, x
        IC_max=IC_max)
   
 }
+
+
+
+boost_echant=function(data,ages,years,B=1000)
+{
+  "data représente les données de mortalités"
+  ages_tail=tail(ages,1)
+  ages_head=ages[1]
+  years_head=years[1]
+  years_tail=tail(years,1)
+  data_ages_head=data$ages[1]
+  data_years_head=data$years[1]
+  data_ages_tail=tail(data$ages,1)
+  data_years_tail=tail(data$years,1)
+  
+  Dxt=data$Dxt[(ages_head-data_ages_head+1):(ages_tail-data_ages_head+1),
+               (years_head-data_years_head+1):(years_tail-data_years_head+1)]
+  
+  Dxt_b=array(dim = c(B,dim(Dxt)[1],dim(Dxt)[2]))
+  #for(x in 1:B){
+  for(a in 1:dim(Dxt)[1]){
+    for(b in 1:dim(Dxt)[2])
+    {
+      Dxt_b[,a,b]=rpois(B,Dxt[a,b])
+    }
+  }
+  #}
+  Dxt_b
+}
+
+
+param_incertitude=function(data,ages,years,years_pred,c,x1,x2,B=100)
+{
+  "
+  Cette fonction génère des simulations semi-boostrap. L'idée générale, 
+  c'est qu'on simule B échantillon i.i.d de poisson de moyenne (d_{x,t} ou \hat{d}_{x,t}) 
+  et à partir de ces B échantillons on estime puis projette les taux de mortalité à partir 
+  pour chacun des B. Et à partir de ces derniers on construit l'intervalle de confiance basé sur
+  les paramètres du modèle.
+  
+  Args: 
+      data: represents reshaped mortality table; for instance FraMaleData or FraFeMaleData in our case.
+      ages: represents list of ages of train set (20:85+ in our case).
+      years: represents list of years of train set (1980:2011 in our case).
+      years_pred: represents list of years of prediction set (2012:2100 in our case).
+      
+  Returns:
+      mu_pred: tensor with shape [B, ages, years_pred]
+      
+  "
+  a_min=data$ages[1]
+  a_max=tail(data$ages,1)
+  y_min=data$years[1]
+  y_max=tail(data$years,1)
+  dxt=boost_echant(data,a_min:a_max,y_min:y_max,B)
+  mu_pred=array(dim=c(B,length(ages),length(years_pred)))
+  
+  data$Dxt=dxt[1,,]
+  model=get_estimation_new_model(data,ages,
+                       years,c,a_c=65,x1,x2)
+  mu_pred[1,,]=get_predict_new_model(model,years_pred,i=1, method = "ARIMA")$mxt_pred
+  
+  #plot(ts(mu_pred[1,(a_plot-20+1),],start = years_pred[1]),col='black',
+  #    ylim=c(min(mu_pred[1,(a_plot-20+1),]),
+  #           max(mu_pred[1,(a_plot-20+1),])))
+  
+  for(i in 2:B)
+  {
+    data$Dxt=dxt[i,,]
+    model=get_estimation_new_model(data,ages,
+                         years,c,a_c=65,x1,x2)
+    mu_pred[i,,]=get_predict_new_model(model,years_pred,i=1, method = "ARIMA")$mxt_pred
+    #lines(ts(mu_pred[i,(a_plot-20+1),],start = years_pred[1]),
+    #      col="black",ylim=c(min(mu_pred[i,(a_plot-20+1),]),
+    #                        max(mu_pred[i,(a_plot-20+1),])))
+  }
+  mean_pred=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages,years_pred))
+  se_pred=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages,years_pred))
+  IC_min=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages,years_pred))
+  IC_max=matrix(data=0, nrow = dim(mu_pred)[2],ncol=dim(mu_pred)[3],dimnames = list(ages,years_pred))
+  for (x in 1:dim(mu_pred)[2])
+  {
+    for (y in 1:dim(mu_pred)[3])
+    {
+      mean_pred[x,y]=mean(mu_pred[,x,y])
+      se_pred[x,y]=sd(mu_pred[,x,y])
+      IC_min[x,y]=mean_pred[x,y]-1.645*se_pred[x,y]/sqrt(B)
+      IC_max[x,y]=mean_pred[x,y]+1.645*se_pred[x,y]/sqrt(B)
+      #IC_min[x,y]=mean(sort(mu_pred[,x,y])[1:500])
+      #IC_max[x,y]=mean(sort(mu_pred[,x,y],decreasing = TRUE)[1:500])
+    }
+  }
+  list(mu_pred=mu_pred,
+       mean_pred=mean_pred,
+       se_pred=se_pred,
+       IC_min=IC_min,
+       IC_max=IC_max)
+  
+}
+
+
