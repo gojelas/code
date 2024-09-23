@@ -195,18 +195,19 @@ sim2_with_iarima = sim_ic_method_with_iarima(model2,ages.fit = 20:85,years.fit =
 mu_pred=get_predict_new_model(best_model,years_pred = 2012:2100,i=1)
 rate=FraMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraMaleData$Ext[21:86,(1980-1816+1):(2019-1816+1)]
 
+
 par(mfrow=c(2,2))
 a=36
 probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
 #text(0.5,0.5,"",cex=2,font=2)
 plot(r,col=1,xlim=c(2000,2100),
-       ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
+       ylim=c((min(mu_pred$mxt_pred[a,])-0.001),max(rate[a,years_start:years_end])),
      xlab="years",ylab="central mortality rate",main="Male-age 55")
 fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
-    llab=FALSE, rlab = FALSE,medlab = NULL)
-lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+    llab=FALSE, rlab = FALSE,medlab = NULL, med.col = "black")
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="black", lwd=2, lty=2)
 #legend(2009,0.0016,legend =c("observed rate","rate predicted by the model",
 #                             "central trajectories of simulations"),
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
@@ -216,12 +217,12 @@ a=46
 probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
-     ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
+     ylim=c(min(mu_pred$mxt_pred[a,])-0.002,max(rate[a,years_start:years_end])),
      xlab="years",ylab="central mortality rate",pch=20,main="Male-age 65")
 fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
-    llab=FALSE, rlab = FALSE,medlab = NULL)
-lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+    llab=FALSE, rlab = FALSE,medlab = NULL, med.col = "black")
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="black", lwd=2, lty=2)
 #legend(2009,0.0052,legend =c("observed rate","rate predicted by the model",
 #                             "central trajectories of simulations"),
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
@@ -234,12 +235,12 @@ a=56
 probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
-     ylim=c(min(mu_pred$mxt_pred[a,])-0.004,max(rate[a,years_start:years_end])),
+     ylim=c(min(mu_pred$mxt_pred[a,])-0.005,max(rate[a,years_start:years_end])),
      xlab="years",ylab="central mortality rate",pch=20,main="Male-age 75")
 fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
-    llab=FALSE, rlab = FALSE,medlab = NULL)
-lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+    llab=FALSE, rlab = FALSE,medlab = NULL, med.col = 'black')
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="black", lwd=2, lty=2)
 #legend(2009,0.027,legend =c("observed rate","rate predicted by the model",
 #                            "central trajectories of simulations"),
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
@@ -249,12 +250,12 @@ a=66
 probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
-     ylim=c(min(mu_pred$mxt_pred[a,])-0.01,max(rate[a,years_start:years_end])),
+     ylim=c(min(mu_pred$mxt_pred[a,])-0.025,max(rate[a,years_start:years_end])),
      xlab="years",ylab="central mortality rate",pch=20,main='Male-age 85+')
 fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
-    llab=FALSE, rlab = FALSE,medlab = NULL)
-lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+    llab=FALSE, rlab = FALSE,medlab = NULL,med.col = 'black')
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="black", lwd=2, lty=2)
 #legend(2009,0.064,legend =c("observed rate","rate predicted by the model",
 #                            "central trajectories of simulations"),
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
@@ -472,12 +473,12 @@ probs = c(90, 95)
 r=ts(rate_f[a,years_start:years_end],start = 2000)
 #text(0.5,0.5,"",cex=2,font=2)
 plot(r,col=1,xlim=c(2000,2100),
-     ylim=c(min(mu_pred_f$mxt_pred[a,])-0.00015,max(rate_f[a,years_start:years_end])),
+     ylim=c(min(mu_pred_f$mxt_pred[a,])-0.0005,max(rate_f[a,years_start:years_end])),
      xlab="years",ylab="central mortality rate",main="Female-age 55")
 fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
-    llab=FALSE, rlab = FALSE,medlab = NULL)
-lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
+    llab=FALSE, rlab = FALSE,medlab = NULL, med.col = 'black')
+lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="black", lwd=2, lty=2)
 #legend(2009,0.0007,legend =c("observed rate","rate predicted by the model",
 #                             "central trajectories of simulations"),
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
@@ -491,8 +492,8 @@ plot(r,col=1,xlim=c(2000,2100),
      xlab="years",ylab="central mortality rate",pch=20,main="Female-age 65")
 fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
-    llab=FALSE, rlab = FALSE,medlab = NULL)
-lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
+    llab=FALSE, rlab = FALSE,medlab = NULL, med.col = 'black')
+lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="black", lwd=2, lty=2)
 #legend(2009,0.0023,legend =c("observed rate","rate predicted by the model",
 #                             "central trajectories of simulations"),
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
@@ -509,8 +510,8 @@ plot(r,col=1,xlim=c(2000,2100),
      xlab="years",ylab="central mortality rate",pch=20,main="Female-age 75")
 fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
-    llab=FALSE, rlab = FALSE,medlab = NULL)
-lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
+    llab=FALSE, rlab = FALSE,medlab = NULL, med.col = 'black')
+lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="black", lwd=2, lty=2)
 #legend(2009,0.010,legend =c("observed rate","rate predicted by the model",
 #                            "central trajectories of simulations"),
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
@@ -524,8 +525,8 @@ plot(r,col=1,xlim=c(2000,2100),
      xlab="years",ylab="central mortality rate",pch=20,main='Female-age 85+')
 fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
-    llab=FALSE, rlab = FALSE,medlab = NULL)
-lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
+    llab=FALSE, rlab = FALSE,medlab = NULL, med.col = 'black')
+lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="black", lwd=2, lty=2)
 #legend(2009,0.033,legend =c("observed rate","rate predicted by the model",
 #                            "central trajectories of simulations"),
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
