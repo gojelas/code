@@ -57,23 +57,6 @@ df['RCP4.5']=df_
 df['RCP8.5']=df__
 
 df
-for(i in 1:dim(df)[1])
-{
-  if (((df[i,2])-(df[i,1])) < 0)
-  {
-    df[i,2]=df[i,2]+(df[i,1])-(df[i,2])+0.5
-  }
-}
-
-for(i in 1:dim(df)[1])
-{
-  if (((df[i,3])-(df[i,2])) < 0)
-  {
-    df[i,3]=df[i,3]+(df[i,2])-(df[i,3])+0.5
-  }
-}
-df
-sum((df[,2])-(df[,1]))
 
 plot(ts(df[,1],start = 1961))
 lines(ts(df[,2],start = 1961),col='orange')
@@ -83,8 +66,8 @@ lines(ts(df[,3],start = 1961),col='red')
 ###################################################
 #### Fonctions utilisées dans la modélisation #####
 ###################################################
-source(file="models_functions.R")
-source(file = "Lee Carter.R")
+source(file="new_model_function.R")
+#source(file = "Lee Carter.R")
 
 
 ##############################################
@@ -128,14 +111,19 @@ years.fit=1980:2011
 Ic=df[(years.fit[1]-1961+1):(tail(years.fit,1)-1961+1),1]
 a_m=mean(Ic)
 a_c=65
-c_x=0.54
+c_x=0.58
 I_t=pmax((Ic-mean(Ic)),0)
 fr_m=FraMaleData$Dxt[21:86,(years.fit[1]-1816+1):(tail(years.fit,1)-1816+1)]
 fr_e=FraMaleData$Ext[21:86,(years.fit[1]-1816+1):(tail(years.fit,1)-1816+1)]
 wei=genWeightMat(ages=ages.fit,years=years.fit)
 model2=new_model_function(fr_m,fr_e,wei,Ic,a_m,c_x,a_c,ages.fit,years.fit,x1,x2)
 
-plot(model2$kt5,type="l")
+plot(model2_f$gc,type="l")
+
+par(mfrow=c(1,1))
+fitgc = auto.arima(model2_f$gc)
+fore = forecast(fitgc, h=50)
+plot(fore)
 
 
 #### Critère de performance du modèle
@@ -146,43 +134,26 @@ get_criterion(model2,FraMaleData,ages.fit,years.fit)
 years.fit=1980:2011
 ages.fit=20:85
 #mx_test=male_rate[21:86,197:204]
-best_model=get_estimation(FraMaleData,ages = ages.fit,
-                          years = years.fit,c = 0.54,
+best_model=get_estimation_new_model(FraMaleData,ages = ages.fit,
+                          years = years.fit,c = 0.58,
                           a_c = 65,x1 = 45,x2 = 60)
-mu_pred=get_predict(best_model,years_pred = 2012:2019,3)
+mu_pred=get_predict_new_model(best_model,years_pred = 2012:2019,i=1) # i représente le scénario RCP, jusqu'en 2019 c'est le
+# même pour tous les scénarios, parce qu'on considère une température connue déjà.
 mx_test=FraMaleData$Dxt[21:86,(2012-1816+1):(2019-1816+1)]/FraMaleData$Ext[21:86,(2012-1816+1):(2019-1816+1)]
 
 mape_pred=mean(abs(mu_pred$mxt_pred-mx_test)/mx_test)
 mape_pred
 
-kt5=best_model$kt5
-x = seq(from = 1 , to = length(kt5) , by = 1)
-y = kt5
-l = Reg(x , y)# Data augmentation by inserting two points.
 
-
-kt5_est=ts(l$y,start=1,frequency = 1)
-fit5=auto.arima(kt5_est)
-#acf(kt5_est)
-#fit5=Arima(kt5_est,order = c(2,0,1))
-fore_5=forecast(fit5,20*h)
-t=seq(3,(20*h),by=3)
-kt5_pred=fore_5$mean[t]
-plot(fore_5)
-print(kt5_pred)
-
-
-
-####################################        
-### Comparaison des mxt estimés ####
-####################################
-
+###################################################################################################        
+### Comparaison des mxt estimés et prédits par rapport à la vraie valeur de mxt de 1980 à 2019 ####
+###################################################################################################
 ages.fit=20:85
 years.fit=1980:2011
 
 mx=data_fr$rate$male[ages.fit+1,]
 
-a=55
+a=56 # 56 = 75 - 20 + 1
 mx_a=ts(mx[a,(1980-1816+1):(2019-1816+1)],start=years.fit[1],frequency = 1)
 mod_mxt=fit_model(model2,ages.fit,years.fit)$uxt_fit
 
@@ -207,21 +178,32 @@ lines(ts(mu_pred$mxt_pred[a,],start=2012),type='l',col='red',lwd=3)
 # Cela est basé sur une hypothèse de marche aléatoire multivariée avec drift pour le vecteur 
 # (kt1,kt2,kt2,kt3,kt4) et le paramètre kt5 simulé séparément.
 ##############
-sim2=sim_ic_method2(model2,ages.fit = 20:85,years.fit = 1980:2011,
-                years.pred = 2012:2040,x1 = 45, x2=60,c=0.54,N=5000)
 
-mu_pred=get_predict(best_model,years_pred = 2012:2040,1)
+#sim2=sim_ic_method2(model2,ages.fit = 20:85,years.fit = 1980:2011,
+#                years.pred = 2012:2040,x1 = 45, x2=60,c=0.54,N=5000) 
+# Le cas sim_ic_method2 ne considère pas de simulation sur kt5.
+
+#sim2_new=sim_ic_method_new_model(model2,ages.fit = 20:85,years.fit = 1980:2011,
+#                                   years.pred = 2012:2100,x1 = 45, x2=60, c=0.58, N=5000, method = "ARIMAX")
+
+
+sim2_with_iarima = sim_ic_method_with_iarima(model2,ages.fit = 20:85,years.fit = 1980:2011,
+                                    years.pred = 2012:2100,x1 = 45, x2=60, c=0.58, N=5000, method = "ARIMAX")
+
+
+
+mu_pred=get_predict_new_model(best_model,years_pred = 2012:2100,i=1)
 rate=FraMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraMaleData$Ext[21:86,(1980-1816+1):(2019-1816+1)]
 
 par(mfrow=c(2,2))
-a=6
+a=36
 probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
 #text(0.5,0.5,"",cex=2,font=2)
-plot(r,col=1,xlim=c(2000,2040),
+plot(r,col=1,xlim=c(2000,2100),
        ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",main="Male-age 25")
-fan(sim2$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+     xlab="years",ylab="central mortality rate",main="Male-age 55")
+fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
 lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
@@ -230,13 +212,13 @@ lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
 #       box.lwd = 0.8,box.col="green",box.lty = 2)
 
-a=26
+a=46
 probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
-plot(r,col=1,xlim=c(2000,2040),
+plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 45")
-fan(sim2$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 65")
+fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
 lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
@@ -248,13 +230,13 @@ lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
 
 #text(line2user(line=mean(par('mar')[c(2, 4)]), side=2), 
 #     line2user(line=2, side=3), 'Central mortality rate for Male', xpd=NA, cex=2, font=2)
-a=46
+a=56
 probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
-plot(r,col=1,xlim=c(2000,2040),
+plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred$mxt_pred[a,])-0.004,max(rate[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 65")
-fan(sim2$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 75")
+fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
 lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
@@ -263,13 +245,13 @@ lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
 #       box.lwd = 0.8,box.col="green",box.lty = 2)
 
-a=56
+a=66
 probs = c(90, 95)
 r=ts(rate[a,years_start:years_end],start = 2000)
-plot(r,col=1,xlim=c(2000,2040),
+plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred$mxt_pred[a,])-0.01,max(rate[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main='Male-age 75')
-fan(sim2$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+     xlab="years",ylab="central mortality rate",pch=20,main='Male-age 85+')
+fan(sim2_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
 lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
@@ -279,43 +261,16 @@ lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
 #       box.lwd = 0.8,box.col="green",box.lty = 2)
 
 
-############################
-#### Intervalle de confiance par boostrap avec 2,5% des taux plus faible
-# et plus élévés comme borne.
-###########################
-IC=int_conf(FraMaleData,20:85,1980:2011,2012:2070,0.54,45,60,B = 5000)
-######
-model=get_estimation(FraMaleData,20:85,1980:2011,c = 0.54,
-                     a_c = 65, x1 = 45, x2 = 60)
-mu_pred=get_predict(model,2012:2070,1)
 
-m=IC
-rate=FraMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraMaleData$Ext[21:86,(1980-1816+1):(2019-1816+1)]
-a=6
-plot(ts(rate[a,],start = 1980),col=1,xlim=c(1980,2070),
-     ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,])))
-lines(ts(mu_pred$mxt_pred[a,],start = 2012),col=5)
-lines(ts(m$IC_max[a,],start = 2012),col=2)
-lines(ts(m$mean_pred[a,],start = 2012),col=3)
-lines(ts(m$IC_min[a,],start = 2012),col=4)
-
-
-
-###############################################
-### Intervalle de confiance par boostrap avec les niveaux de confiance
-
-
-I2=int_conf(FraMaleData,20:85,1980:2011,2012:2040,0.54,45,60,B = 100)
-######
 
 
 
 ##### Prévision avec les divers scénarios.
-model=get_estimation(FraMaleData,20:85,1980:2011,c = 0.54,
+model=get_estimation_new_model(FraMaleData,20:85,1980:2011,c = 0.58,
                      a_c = 65, x1 = 45, x2 = 60)
-mu_pred_2.6=get_predict(model,2012:2040,1)
-mu_pred_4.5=get_predict(model,2012:2040,2)
-mu_pred_8.5=get_predict(model,2012:2040,3)
+mu_pred_2.6=get_predict_new_model(model,2012:2040,1)
+mu_pred_4.5=get_predict_new_model(model,2012:2040,2)
+mu_pred_8.5=get_predict_new_model(model,2012:2040,3)
 
 plot.new()
 rate=FraMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraMaleData$Ext[21:86,(1980-1816+1):(2019-1816+1)]
@@ -342,6 +297,100 @@ df1
 
 
 
+
+#################################################################
+### Incertitude sur les paramètres estimés par semi-boostrap ####
+#################################################################
+
+incert_param = param_incertitude(FraMaleData, ages=20:85,years= 1980:2011,
+                                   years_pred = 2012:2100,x1=45, x2=60,c=0.58,
+                                   B = 5000)
+mu_pred=get_predict_new_model(best_model,years_pred = 2012:2100,1)
+
+
+rate=FraMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraMaleData$Ext[21:86,(1980-1816+1):(2019-1816+1)]
+
+
+#### Représentation des taux de mortalité pour les âges de 25, 45, 65 et 75 avec les
+# intervalles de confiances de 90% et 95% obtenus par MC et le scénario central (moyenne des simulations)
+# et la projection obtenue avec mon modèle. On commence par l'année 2000 pour mieux voir la
+# largeur des intervalles de confiance.
+par(mfrow=c(2,2))
+a=36
+probs = c(90, 95)
+r=ts(rate[a,years_start:years_end],start = 2000)
+#text(0.5,0.5,"",cex=2,font=2)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",main="Male-age 55")
+fan(incert_param$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.0016,legend =c("observed rate","rate predicted by the model",
+#                             "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+a=46
+probs = c(90, 95)
+r=ts(rate[a,years_start:years_end],start = 2000)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 65")
+fan(incert_param$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.0052,legend =c("observed rate","rate predicted by the model",
+#                             "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+
+#text(line2user(line=mean(par('mar')[c(2, 4)]), side=2), 
+#     line2user(line=2, side=3), 'Central mortality rate for Male', xpd=NA, cex=2, font=2)
+a=56
+probs = c(90, 95)
+r=ts(rate[a,years_start:years_end],start = 2000)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred$mxt_pred[a,])-0.004,max(rate[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 75")
+fan(incert_param$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.027,legend =c("observed rate","rate predicted by the model",
+#                            "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+a=65
+probs = c(90, 95)
+r=ts(rate[a,years_start:years_end],start = 2000)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred$mxt_pred[a,])-0.01,max(rate[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",pch=20,main='Male-age 85+')
+fan(incert_param$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.064,legend =c("observed rate","rate predicted by the model",
+#                            "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+
+
+
+
+
+
+
+
+
+
+
 ##########################
 #### Pour les femmes #####
 ##########################
@@ -351,55 +400,62 @@ ages.fit=20:85
 years.fit=1980:2011
 Ic=df[(years.fit[1]-1961+1):(tail(years.fit,1)-1961+1),1]
 a_m=mean(Ic)
-a_c=67
-c_x=0.3
+a_c=65
+c_x=0.11
 I_t=pmax((Ic-mean(Ic)),0)
 fr_m=FraFeMaleData$Dxt[21:86,(years.fit[1]-1816+1):(tail(years.fit,1)-1816+1)]
 fr_e=FraFeMaleData$Ext[21:86,(years.fit[1]-1816+1):(tail(years.fit,1)-1816+1)]
 wei=genWeightMat(ages=ages.fit,years=years.fit)
 model2_f=new_model_function(fr_m,fr_e,wei,Ic,a_m,c_x,a_c,ages.fit,years.fit,x1,x2)
 
-plot(model2_f$kt5,type="l")
 
+################################################
+#### Critères de performance  et backtesting####
+################################################
 
-
-kt5=model2_f$kt5
-x = seq(from = 1 , to = length(kt5) , by = 1)
-y = kt5
-l = Reg(x , y)# Data augmentation by inserting two points.
-
-kt5_est=ts(l$y,start=1,frequency = 1)
-#fit5=auto.arima(kt5_est,max.p = 4,max.q = 4)
-#fit5=ets(kt5_est)
-fit5=Arima(kt5_est,order = c(3,0,0),include.mean = FALSE)
-pacf(kt5_est)
-fore_5=forecast(fit5,10*h)
-t=seq(3,(10*h),by=3)
-kt5_pred=fore_5$mean[t]
-plot(fore_5)
-kt5_pred
-
-fit5$aic
-
+# 1) Critère
 get_criterion(model2_f,FraFeMaleData,ages.fit,years.fit)
 
 
-#### Back-testing
+# 2) Back-testing
 years.fit=1980:2011
 ages.fit=20:85
 #mx_test=male_rate[21:86,197:204]
-best_model_f=get_estimation(FraFeMaleData,ages = ages.fit,
-                          years = years.fit,c = 0,
-                          a_c = 65,x1 = 45,x2 = 0)
-mu_pred_f=get_predict_f(best_model_f,years_pred = 2012:2019,1,kt5_order = c(2,0,1),val=FALSE)
+best_model_f=get_estimation_new_model(FraFeMaleData,ages = ages.fit,
+                          years = years.fit,c = 0.11,
+                          a_c = 65,x1 = 45,x2 = 60)
+mu_pred_f=get_predict_new_model(best_model_f,years_pred = 2012:2019,1)
 mx_test_f=FraFeMaleData$Dxt[21:86,(2012-1816+1):(2019-1816+1)]/FraFeMaleData$Ext[21:86,(2012-1816+1):(2019-1816+1)]
 
+# MAPE sur test
 mape_pred=mean(abs(mu_pred_f$mxt_pred-mx_test_f)/mx_test_f)
 mape_pred
 
 
-sim2_f=sim_ic_method2(model2_f,ages.fit = 20:85,years.fit = 1980:2011,
-                    years.pred = 2012:2040,x1 = 45, x2=60,c=0,N=5000,kt5_order = c(2,0,1),val = FALSE)
+
+#######################################################################
+#### Intervalle de confiance basé sur l'incertitude liée aux ARIMA #### 
+#######################################################################
+
+
+#### 1) Cas MRWD
+# La fonction "sim_ic_method_new_model" suppose que le vecteur (kt1,kt2,kt3,kt4)
+# suit une marche aléatoire multivariée et part de là pour simuler des scénarios 
+# futurs
+#sim2_f_new=sim_ic_method_new_model(model2_f,ages.fit = 20:85,years.fit = 1980:2011,
+#                                  years.pred = 2012:2100,x1 = 45, x2=60,c=0.11,N=5000, method = "ARIMAX")
+
+
+
+#### 2) Cas IARIMA
+# Dans ce cas on suppose que tous les paramètres temporels sont indépendants et on part des ARIMA correspondant 
+# pour la simulation.
+sim2_f_with_iarima=sim_ic_method_with_iarima(model2_f,ages.fit = 20:85,years.fit = 1980:2011,
+                                   years.pred = 2012:2100,x1 = 45, x2=60,c=0.11,N=5000, method = "ARIMAX")
+
+
+mu_pred_f=get_predict_new_model(best_model_f,years_pred = 2012:2100,1)
+
 
 rate_f=FraFeMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraFeMaleData$Ext[21:86,(1980-1816+1):(2019-1816+1)]
 
@@ -411,14 +467,14 @@ rate_f=FraFeMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraFeMaleData$Ext[21
 par(mfrow=c(2,2))
 years_start=2000-1980+1
 years_end=2019-1980+1
-a=6
+a=36
 probs = c(90, 95)
 r=ts(rate_f[a,years_start:years_end],start = 2000)
 #text(0.5,0.5,"",cex=2,font=2)
-plot(r,col=1,xlim=c(2000,2040),
+plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred_f$mxt_pred[a,])-0.00015,max(rate_f[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",main="Female-age 25")
-fan(sim2_f$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+     xlab="years",ylab="central mortality rate",main="Female-age 55")
+fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
 lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
@@ -427,13 +483,13 @@ lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
 #       box.lwd = 0.8,box.col="green",box.lty = 2)
 
-a=26
+a=46
 probs = c(90, 95)
 r=ts(rate_f[a,years_start:years_end],start = 2000)
-plot(r,col=1,xlim=c(2000,2040),
+plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred_f$mxt_pred[a,])-0.0006,max(rate_f[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 45")
-fan(sim2_f$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 65")
+fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
 lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
@@ -445,13 +501,13 @@ lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
 
 #text(line2user(line=mean(par('mar')[c(2, 4)]), side=2), 
 #     line2user(line=2, side=3), 'Central mortality rate for Male', xpd=NA, cex=2, font=2)
-a=46
+a=56
 probs = c(90, 95)
 r=ts(rate_f[a,years_start:years_end],start = 2000)
-plot(r,col=1,xlim=c(2000,2040),
+plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred_f$mxt_pred[a,])-0.001,max(rate_f[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 65")
-fan(sim2_f$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 75")
+fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
 lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
@@ -460,13 +516,13 @@ lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
 #       box.lwd = 0.8,box.col="green",box.lty = 2)
 
-a=56
+a=66
 probs = c(90, 95)
 r=ts(rate_f[a,years_start:years_end],start = 2000)
-plot(r,col=1,xlim=c(2000,2040),
+plot(r,col=1,xlim=c(2000,2100),
      ylim=c(min(mu_pred_f$mxt_pred[a,])-0.006,max(rate_f[a,years_start:years_end])),
-     xlab="years",ylab="central mortality rate",pch=20,main='Female-age 75')
-fan(sim2_f$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+     xlab="years",ylab="central mortality rate",pch=20,main='Female-age 85+')
+fan(sim2_f_with_iarima$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
     fan.col = colorRampPalette(c("gray", "white")), type = "interval",
     llab=FALSE, rlab = FALSE,medlab = NULL)
 lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
@@ -477,14 +533,21 @@ lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
 
 
 
-model=get_estimation(FraFeMaleData,20:85,1980:2011,c = 0.0,
+
+###########################################################
+# Comparaison des scénarios RCP pour le cas des femmes ####
+###########################################################
+
+
+model=get_estimation_new_model(FraFeMaleData,20:85,1980:2011,c = 0.11,
                      a_c = 65, x1 = 45, x2 = 60)
-mu_pred_2.6_f=get_predict_f(model,2012:2040,1,kt5_order = c(2,0,1))
-mu_pred_4.5_f=get_predict_f(model,2012:2040,2,kt5_order = c(2,0,1))
-mu_pred_8.5_f=get_predict_f(model,2012:2040,3,kt5_order = c(2,0,1))
+mu_pred_2.6_f=get_predict_new_model(model,2012:2100,1, method = "ARIMAX")
+mu_pred_4.5_f=get_predict_new_model(model,2012:2100,2, method = "ARIMAX")
+mu_pred_8.5_f=get_predict_new_model(model,2012:2100,3, method = "ARIMAX")
 
-y1=2025-2012+1
 
+### Année 2050
+y1=2050-2012+1
 rate_male_2.6_f=c(mu_pred_2.6_f$mxt_pred[6,y1], mu_pred_2.6_f$mxt_pred[46,y1], 
                 mu_pred_2.6_f$mxt_pred[56,y1], mu_pred_2.6_f$mxt_pred[61,y1])
 rate_male_4.5_f=c(mu_pred_4.5_f$mxt_pred[6,y1], mu_pred_4.5_f$mxt_pred[46,y1], 
@@ -493,9 +556,107 @@ rate_male_8.5_f=c(mu_pred_8.5_f$mxt_pred[6,y1], mu_pred_8.5_f$mxt_pred[46,y1],
                 mu_pred_8.5_f$mxt_pred[56,y1], mu_pred_8.5_f$mxt_pred[61,y1])
 df1_f=data.frame(data = rbind(rate_male_2.6_f, rate_male_4.5_f, rate_male_8.5_f), 
                row.names = list("RCP 2.6", "RCP 4.5", "RCP 8.5"))
+colnames(df1_f) = list("65ans", )
 df1_f
 
 
-FraMaleData$Ext[76,]
+### Année 2100
+y1=2100-2012+1
+rate_male_2.6_f=c(mu_pred_2.6_f$mxt_pred[6,y1], mu_pred_2.6_f$mxt_pred[46,y1], 
+                  mu_pred_2.6_f$mxt_pred[56,y1], mu_pred_2.6_f$mxt_pred[61,y1])
+rate_male_4.5_f=c(mu_pred_4.5_f$mxt_pred[6,y1], mu_pred_4.5_f$mxt_pred[46,y1], 
+                  mu_pred_4.5_f$mxt_pred[56,y1], mu_pred_4.5_f$mxt_pred[61,y1])
+rate_male_8.5_f=c(mu_pred_8.5_f$mxt_pred[6,y1], mu_pred_8.5_f$mxt_pred[46,y1], 
+                  mu_pred_8.5_f$mxt_pred[56,y1], mu_pred_8.5_f$mxt_pred[61,y1])
+df1_f=data.frame(data = rbind(rate_male_2.6_f, rate_male_4.5_f, rate_male_8.5_f), 
+                 row.names = list("RCP 2.6", "RCP 4.5", "RCP 8.5"))
+df1_f
+
+
+
+
+###################################################################################
+### Incertitude sur les paramètres estimés par semi-boostrap le cas des femmes ####
+###################################################################################
+
+incert_param_f = param_incertitude(FraFeMaleData, ages=20:85,years= 1980:2011,
+                                   years_pred = 2012:2100,x1=45, x2=60,c=0.11,
+                                   B = 50)
+mu_pred_f=get_predict_new_model(best_model_f,years_pred = 2012:2100,1)
+
+
+rate_f=FraFeMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraFeMaleData$Ext[21:86,(1980-1816+1):(2019-1816+1)]
+
+
+#### Représentation des taux de mortalité pour les âges de 25, 45, 65 et 75 avec les
+# intervalles de confiances de 90% et 95% obtenus par MC et le scénario central (moyenne des simulations)
+# et la projection obtenue avec mon modèle. On commence par l'année 2000 pour mieux voir la
+# largeur des intervalles de confiance.
+par(mfrow=c(2,2))
+years_start=2000-1980+1
+years_end=2019-1980+1
+a=36
+probs = c(90, 95)
+r=ts(rate_f[a,years_start:years_end],start = 2000)
+#text(0.5,0.5,"",cex=2,font=2)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred_f$mxt_pred[a,])-0.00015,max(rate_f[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",main="Female-age 55")
+fan(incert_param_f$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.0007,legend =c("observed rate","rate predicted by the model",
+#                             "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+a=46
+probs = c(90, 95)
+r=ts(rate_f[a,years_start:years_end],start = 2000)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred_f$mxt_pred[a,])-0.0006,max(rate_f[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 65")
+fan(incert_param_f$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.0023,legend =c("observed rate","rate predicted by the model",
+#                             "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+
+#text(line2user(line=mean(par('mar')[c(2, 4)]), side=2), 
+#     line2user(line=2, side=3), 'Central mortality rate for Male', xpd=NA, cex=2, font=2)
+a=56
+probs = c(90, 95)
+r=ts(rate_f[a,years_start:years_end],start = 2000)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred_f$mxt_pred[a,])-0.001,max(rate_f[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",pch=20,main="Female-age 75")
+fan(incert_param_f$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.010,legend =c("observed rate","rate predicted by the model",
+#                            "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+a=65
+probs = c(90, 95)
+r=ts(rate_f[a,years_start:years_end],start = 2000)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred_f$mxt_pred[a,])-0.006,max(rate_f[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",pch=20,main='Female-age 85+')
+fan(incert_param_f$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.033,legend =c("observed rate","rate predicted by the model",
+#                            "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
 
 

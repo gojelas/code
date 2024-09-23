@@ -268,9 +268,9 @@ lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
 ##### Prévision avec les divers scénarios.
 model=get_estimation_new_model(FraMaleData,20:85,1980:2011,c = 0.58,
                      a_c = 65, x1 = 45, x2 = 60)
-mu_pred_2.6=get_predict(model,2012:2040,1)
-mu_pred_4.5=get_predict(model,2012:2040,2)
-mu_pred_8.5=get_predict(model,2012:2040,3)
+mu_pred_2.6=get_predict_new_model(model,2012:2040,1)
+mu_pred_4.5=get_predict_new_model(model,2012:2040,2)
+mu_pred_8.5=get_predict_new_model(model,2012:2040,3)
 
 plot.new()
 rate=FraMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraMaleData$Ext[21:86,(1980-1816+1):(2019-1816+1)]
@@ -293,6 +293,100 @@ df1=data.frame(data = rbind(rate_male_2.6, rate_male_4.5, rate_male_8.5),
               row.names = list("RCP 2.6", "RCP 4.5", "RCP 8.5"))
 
 df1
+
+
+
+
+
+#################################################################
+### Incertitude sur les paramètres estimés par semi-boostrap ####
+#################################################################
+
+incert_param = param_incertitude(FraMaleData, ages=20:85,years= 1980:2011,
+                                   years_pred = 2012:2100,x1=45, x2=60,c=0.58,
+                                   B = 5000)
+mu_pred=get_predict_new_model(best_model,years_pred = 2012:2100,1)
+
+
+rate=FraMaleData$Dxt[21:86,(1980-1816+1):(2019-1816+1)]/FraMaleData$Ext[21:86,(1980-1816+1):(2019-1816+1)]
+
+
+#### Représentation des taux de mortalité pour les âges de 25, 45, 65 et 75 avec les
+# intervalles de confiances de 90% et 95% obtenus par MC et le scénario central (moyenne des simulations)
+# et la projection obtenue avec mon modèle. On commence par l'année 2000 pour mieux voir la
+# largeur des intervalles de confiance.
+par(mfrow=c(2,2))
+a=36
+probs = c(90, 95)
+r=ts(rate[a,years_start:years_end],start = 2000)
+#text(0.5,0.5,"",cex=2,font=2)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",main="Male-age 55")
+fan(incert_param$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.0016,legend =c("observed rate","rate predicted by the model",
+#                             "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+a=46
+probs = c(90, 95)
+r=ts(rate[a,years_start:years_end],start = 2000)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred$mxt_pred[a,]),max(rate[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 65")
+fan(incert_param$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.0052,legend =c("observed rate","rate predicted by the model",
+#                             "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+
+#text(line2user(line=mean(par('mar')[c(2, 4)]), side=2), 
+#     line2user(line=2, side=3), 'Central mortality rate for Male', xpd=NA, cex=2, font=2)
+a=56
+probs = c(90, 95)
+r=ts(rate[a,years_start:years_end],start = 2000)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred$mxt_pred[a,])-0.004,max(rate[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",pch=20,main="Male-age 75")
+fan(incert_param$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.027,legend =c("observed rate","rate predicted by the model",
+#                            "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+a=65
+probs = c(90, 95)
+r=ts(rate[a,years_start:years_end],start = 2000)
+plot(r,col=1,xlim=c(2000,2100),
+     ylim=c(min(mu_pred$mxt_pred[a,])-0.01,max(rate[a,years_start:years_end])),
+     xlab="years",ylab="central mortality rate",pch=20,main='Male-age 85+')
+fan(incert_param$mu_pred[,a,],start = 2012,n.fan = 4,probs = probs,
+    fan.col = colorRampPalette(c("gray", "white")), type = "interval",
+    llab=FALSE, rlab = FALSE,medlab = NULL)
+lines(ts(mu_pred$mxt_pred[a,],start = 2012),col="red")
+#legend(2009,0.064,legend =c("observed rate","rate predicted by the model",
+#                            "central trajectories of simulations"),
+#       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
+#       box.lwd = 0.8,box.col="green",box.lty = 2)
+
+
+
+
+
+
+
+
 
 
 
@@ -481,9 +575,9 @@ df1_f
 
 
 
-#################################################################
-### Incertitude sur les paramètres estimés par semi-boostrap ####
-#################################################################
+###################################################################################
+### Incertitude sur les paramètres estimés par semi-boostrap le cas des femmes ####
+###################################################################################
 
 incert_param_f = param_incertitude(FraFeMaleData, ages=20:85,years= 1980:2011,
                                    years_pred = 2012:2100,x1=45, x2=60,c=0.11,
@@ -550,7 +644,7 @@ lines(ts(mu_pred_f$mxt_pred[a,],start = 2012),col="red")
 #       col=c("black","red","orange"),cex=0.7,lty=1,lwd = 2,
 #       box.lwd = 0.8,box.col="green",box.lty = 2)
 
-a=66
+a=65
 probs = c(90, 95)
 r=ts(rate_f[a,years_start:years_end],start = 2000)
 plot(r,col=1,xlim=c(2000,2100),
